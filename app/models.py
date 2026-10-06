@@ -15,8 +15,15 @@ class Task(Base):
     # for permanent tasks: the day they start appearing from
     start_date = Column(Date, nullable=False)
     archived = Column(Boolean, nullable=False, default=False)
+    # for permanent tasks: first day they no longer appear (history before it is kept)
+    archived_on = Column(Date, nullable=True)
 
     completions = relationship("Completion", back_populates="task", cascade="all, delete-orphan")
+
+    def applies_to(self, day) -> bool:
+        if self.is_permanent:
+            return self.start_date <= day and (self.archived_on is None or day < self.archived_on)
+        return self.specific_date == day
 
 
 class Completion(Base):
