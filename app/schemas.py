@@ -1,7 +1,37 @@
 from datetime import date
 from typing import Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
+
+
+# ---------- accounts ----------
+class Credentials(BaseModel):
+    username: str = Field(min_length=3, max_length=30, pattern=r"^[A-Za-z0-9_.-]+$")
+    password: str = Field(min_length=8, max_length=128)
+
+    @field_validator("username")
+    @classmethod
+    def lowercase(cls, v: str) -> str:
+        return v.lower()
+
+
+class LoginIn(BaseModel):
+    # no format rules here: a wrong-shaped name should just fail to log in
+    username: str = Field(max_length=64)
+    password: str = Field(max_length=128)
+
+
+class PasswordChange(BaseModel):
+    current_password: str = Field(max_length=128)
+    new_password: str = Field(min_length=8, max_length=128)
+
+
+class Me(BaseModel):
+    authenticated: bool
+    username: Optional[str] = None
+    # lets the client decide between the awakening (sign-up) and the login screen
+    registration_open: bool
+    has_users: bool
 
 
 class TaskCreate(BaseModel):

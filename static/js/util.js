@@ -34,7 +34,13 @@ export function pref(key, fallback) {
 export function setPref(key, value) {
   try { localStorage.setItem(`sl:${key}`, value); } catch (e) { /* private mode */ }
 }
-export const userName = () => pref("name", "Hunter");
+// the logged-in Player, as told by the server (/api/auth/me)
+let player = null;
+export const setPlayer = (name) => { player = name || null; };
+export const userName = () => player || "Player";
+// per-Player keys, so two accounts on one browser don't share "already shown today" flags
+export const playerPref = (key, fallback) => pref(`${player}:${key}`, fallback);
+export const setPlayerPref = (key, value) => setPref(`${player}:${key}`, value);
 
 // ---------- strings ----------
 export const esc = (v) =>

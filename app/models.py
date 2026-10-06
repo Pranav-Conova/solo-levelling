@@ -1,13 +1,36 @@
-from sqlalchemy import Column, Integer, String, Boolean, Date, ForeignKey, UniqueConstraint
+from sqlalchemy import Column, Integer, String, Boolean, Date, DateTime, ForeignKey, UniqueConstraint
 from sqlalchemy.orm import relationship
 
 from .database import Base
+
+
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(Integer, primary_key=True, index=True)
+    # stored lowercase so "Jinwoo" and "jinwoo" are the same Player
+    username = Column(String, nullable=False, unique=True, index=True)
+    password_hash = Column(String, nullable=False)
+    created_at = Column(DateTime, nullable=False)
+
+
+class AuthSession(Base):
+    __tablename__ = "sessions"
+
+    id = Column(Integer, primary_key=True, index=True)
+    # only a hash of the cookie value is stored, so a leaked database can't be used to log in
+    token_hash = Column(String, nullable=False, unique=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    created_at = Column(DateTime, nullable=False)
+    expires_at = Column(DateTime, nullable=False)
 
 
 class Task(Base):
     __tablename__ = "tasks"
 
     id = Column(Integer, primary_key=True, index=True)
+    # nullable only for rows created before accounts existed; the first account claims them
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True, index=True)
     title = Column(String, nullable=False)
     is_permanent = Column(Boolean, nullable=False, default=False)
     # for one-off tasks: the single day this task belongs to

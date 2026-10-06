@@ -10,3 +10,6 @@ services:
         value: 3.12.8
       - key: DATABASE_URL
         sync: false
+      # set to "false" after creating your own account so strangers can't sign up
+      - key: ALLOW_REGISTRATION
+        value: "true"

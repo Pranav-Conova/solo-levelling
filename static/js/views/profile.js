@@ -1,8 +1,8 @@
 import { api, changed } from "../api.js";
 import { openAdd } from "../add.js";
 import {
-  addDays, countUp, ding, esc, fmt, heat, icon, parseISO, plural, reducedMotion,
-  setPref, soundOn, toast, todayISO, userName, withUndo,
+  addDays, closeDialog, countUp, ding, esc, fmt, heat, icon, makeWindow, openDialog, parseISO, plural,
+  reducedMotion, setPref, soundOn, toast, todayISO, userName, winHead, wireClose, withUndo,
 } from "../util.js";
 
 export const title = "Status";
@@ -51,10 +51,7 @@ export function mount(el, arg) {
       <div class="win-head"><h1 class="box">Status</h1></div>
       <div class="status-top">
         <div class="status-lines">
-          <div class="status-name" data-name-wrap>
-            <span class="k">NAME:</span>&nbsp;<span class="v">${esc(userName())}</span>
-            <button class="icon-btn" type="button" data-edit aria-label="Edit name">${icon("pencil", "icon-sm")}</button>
-          </div>
+          <div class="status-name"><span class="k">NAME:</span>&nbsp;<span class="v">${esc(userName())}</span></div>
           <div><span class="k">JOB:</span> <span class="v">None</span></div>
           <div><span class="k">TITLE:</span> <span class="v">${esc(RANK_TITLES[stats.rank] || `${stats.rank}-Rank Hunter`)}</span></div>
           <div><span class="k">FATIGUE:</span> <span class="v">${total - done}</span> <small style="color:var(--text-3);font-size:14px">quests left today</small></div>
@@ -77,12 +74,18 @@ export function mount(el, arg) {
       <div class="status-foot">
         <span class="caps">System sound</span>
         <button class="btn btn-sys btn-sm" type="button" data-sound aria-pressed="${soundOn()}">${icon(soundOn() ? "volume" : "mute", "icon-sm")} ${soundOn() ? "On" : "Off"}</button>
+      </div>
+      <div class="win-divider"></div>
+      <div class="status-foot">
+        <button class="btn btn-sys btn-sm" type="button" data-password>${icon("key", "icon-sm")} Change password</button>
+        <button class="btn btn-text btn-danger" type="button" data-logout>${icon("logout", "icon-sm")} Log out</button>
       </div>`;
     statusEl.querySelectorAll("[data-count]").forEach((n) => { if (!quiet) countUp(n, Number(n.dataset.count)); });
     const bars = statusEl.querySelectorAll("[data-bar]");
     const fill = () => bars.forEach((b) => b.style.setProperty("--p", b.dataset.bar));
     if (quiet) fill(); else requestAnimationFrame(() => requestAnimationFrame(fill));
-    statusEl.querySelector("[data-edit]").addEventListener("click", editName);
+    statusEl.querySelector("[data-password]").addEventListener("click", openPasswordWindow);
+    statusEl.querySelector("[data-logout]").addEventListener("click", logout);
     statusEl.querySelector("[data-sound]").addEventListener("click", () => {
       setPref("sound", soundOn() ? "off" : "on");
       renderStatus(true);
@@ -91,26 +94,80 @@ export function mount(el, arg) {
     });
   }
 
-  function editName() {
-    const wrap = statusEl.querySelector("[data-name-wrap]");
-    wrap.innerHTML = `
-      <span class="k">NAME:</span>&nbsp;
-      <form>
-        <label class="sr-only" for="name-input">Your name</label>
-        <input class="input" id="name-input" maxlength="30" value="${esc(userName())}" style="min-height:40px;width:190px" />
-        <button class="btn btn-primary btn-sm" type="submit">Save</button>
+  // ---------- account ----------
+  async function logout(e) {
+    const btn = e.currentTarget;
+    btn.disabled = true;
+    try {
+      await api.logout();
+      document.dispatchEvent(new CustomEvent("tracker:session", { detail: await api.me() }));
+    } catch (err) {
+      toast(`Couldn't log out: ${err.message}`, { tone: "error" });
+      btn.disabled = false;
+    }
+  }
+
+  function openPasswordWindow() {
+    const dlg = makeWindow("Change password");
+    dlg.innerHTML = `
+      <form class="win-body sys auth-form" method="post" novalidate>
+        ${winHead("Password", "key")}
+        <input type="text" name="username" autocomplete="username" value="${esc(userName())}" hidden />
+        <div class="field">
+          <label for="pw-current">Current password</label>
+          <input class="input" id="pw-current" name="current" type="password" autocomplete="current-password" required aria-describedby="pw-current-err" />
+          <p class="field-error" id="pw-current-err" hidden></p>
+        </div>
+        <div class="field">
+          <label for="pw-new">New password</label>
+          <input class="input" id="pw-new" name="next" type="password" autocomplete="new-password" required aria-describedby="pw-new-help pw-new-err" />
+          <p class="field-help" id="pw-new-help">At least 8 characters. Your other devices will be signed out.</p>
+          <p class="field-error" id="pw-new-err" hidden></p>
+        </div>
+        <div class="field">
+          <label for="pw-confirm">Confirm new password</label>
+          <input class="input" id="pw-confirm" name="confirm" type="password" autocomplete="new-password" required aria-describedby="pw-confirm-err" />
+          <p class="field-error" id="pw-confirm-err" hidden></p>
+        </div>
+        <p class="form-error" role="alert" data-form-error hidden></p>
+        <button class="btn btn-primary btn-block" type="submit">Change password</button>
       </form>`;
-    const form = wrap.querySelector("form");
-    const input = form.querySelector("input");
-    input.select();
-    const finish = (save) => {
-      const value = input.value.trim();
-      if (save && value) { setPref("name", value); changed({ kind: "name", source: "profile" }); }
-      renderStatus(true);
-      statusEl.querySelector("[data-edit]").focus();
+    wireClose(dlg);
+    const form = dlg.querySelector("form");
+    const { current, next, confirm } = form.elements;
+    const button = form.querySelector("[type=submit]");
+    const setError = (input, msg) => {
+      const el = form.querySelector(`#${input.id}-err`);
+      el.textContent = msg || "";
+      el.hidden = !msg;
+      input.setAttribute("aria-invalid", msg ? "true" : "false");
     };
-    form.addEventListener("submit", (e) => { e.preventDefault(); finish(true); });
-    input.addEventListener("keydown", (e) => { if (e.key === "Escape") { e.preventDefault(); e.stopPropagation(); finish(false); } });
+    form.addEventListener("submit", async (e) => {
+      e.preventDefault();
+      form.querySelector("[data-form-error]").hidden = true;
+      const problems = [
+        [current, current.value ? "" : "Enter your current password."],
+        [next, next.value.length >= 8 ? "" : "Use at least 8 characters."],
+        [confirm, confirm.value === next.value ? "" : "The passwords don't match."],
+      ];
+      problems.forEach(([input, msg]) => setError(input, msg));
+      const first = problems.find(([, msg]) => msg);
+      if (first) { first[0].focus(); return; }
+      button.disabled = true;
+      button.textContent = "Saving…";
+      try {
+        await api.changePassword(current.value, next.value);
+        closeDialog(dlg);
+        toast("Password changed. Other devices were signed out.");
+      } catch (err) {
+        if (err.status === 400) { setError(current, err.message); current.select(); }
+        else { const box = form.querySelector("[data-form-error]"); box.textContent = err.message; box.hidden = false; }
+        button.disabled = false;
+        button.textContent = "Change password";
+      }
+    });
+    openDialog(dlg);
+    current.focus();
   }
 
   // ---------- tabs ----------

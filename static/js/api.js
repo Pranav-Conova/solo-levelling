@@ -1,21 +1,45 @@
 import { todayISO } from "./util.js";
 
+export class ApiError extends Error {
+  constructor(message, status) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function request(method, url, body) {
   const res = await fetch(url, {
     method,
-    headers: body ? { "Content-Type": "application/json" } : undefined,
+    headers: {
+      // the server rejects state-changing calls without this header (CSRF guard)
+      "X-Requested-With": "fetch",
+      ...(body ? { "Content-Type": "application/json" } : {}),
+    },
     body: body ? JSON.stringify(body) : undefined,
+    credentials: "same-origin",
     keepalive: method !== "GET", // lets deferred deletes finish if the tab closes
   });
   if (!res.ok) {
     const data = await res.json().catch(() => ({}));
-    const detail = Array.isArray(data.detail) ? data.detail[0]?.msg : data.detail;
-    throw new Error(detail || `Request failed (${res.status})`);
+    const detail = Array.isArray(data.detail)
+      ? data.detail.map((d) => `${d.loc?.at(-1) ?? "field"}: ${d.msg}`).join("; ")
+      : data.detail;
+    // a session that expired mid-use sends the Player back to the login window
+    if (res.status === 401 && !url.startsWith("/api/auth/")) {
+      document.dispatchEvent(new CustomEvent("tracker:unauthorized"));
+    }
+    throw new ApiError(detail || `Request failed (${res.status})`, res.status);
   }
   return res.json();
 }
 
 export const api = {
+  me: () => request("GET", "/api/auth/me"),
+  register: (username, password) => request("POST", "/api/auth/register", { username, password }),
+  login: (username, password) => request("POST", "/api/auth/login", { username, password }),
+  logout: () => request("POST", "/api/auth/logout"),
+  changePassword: (current_password, new_password) => request("POST", "/api/auth/password", { current_password, new_password }),
+
   day: (date) => request("GET", `/api/days/${date}`),
   calendar: (start, end) => request("GET", `/api/calendar?start=${start}&end=${end}`),
   habits: () => request("GET", `/api/habits?today=${todayISO()}`),

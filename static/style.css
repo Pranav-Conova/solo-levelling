@@ -76,6 +76,8 @@ a { color: inherit; text-decoration: none; }
 button, input { font: inherit; color: inherit; }
 button { cursor: pointer; background: none; border: 0; padding: 0; touch-action: manipulation; }
 button:disabled { cursor: not-allowed; }
+/* author styles (display: grid/flex) must never un-hide something marked hidden */
+[hidden] { display: none !important; }
 
 .icon {
   width: 24px; height: 24px; flex: none;
@@ -325,6 +327,21 @@ input[type="date"].input { color-scheme: dark; }
 .field-row .over { color: var(--danger); font-weight: 700; }
 .helper { font-size: 15px; color: var(--text-2); min-height: 1.4em; }
 
+/* account forms */
+.auth-form { display: grid; gap: 14px; text-align: left; }
+.field-help { font-size: 14px; color: var(--text-3); }
+.field-help:empty { display: none; }
+.field-error, .form-error { font-size: 15px; font-weight: 600; color: var(--danger); }
+.field-error::before, .form-error::before { content: "[Error] "; font-weight: 700; }
+.form-error { padding: 10px 12px; border: 1px solid rgba(255, 107, 122, .6); background: rgba(255, 77, 94, .08); }
+.input[aria-invalid="true"] { border-color: var(--danger); box-shadow: 0 0 0 3px rgba(255, 77, 94, .18); }
+.pw-wrap { position: relative; }
+.pw-wrap .input { padding-right: 52px; }
+.pw-toggle { position: absolute; top: 2px; right: 2px; }
+.auth-switch { text-align: center; font-size: 16px; color: var(--text-2); }
+.auth-switch a { color: var(--blue); font-weight: 700; text-decoration: underline; text-underline-offset: 3px; }
+.auth-switch a:hover { text-shadow: var(--text-glow); }
+
 /* ============================================================
    Dock
    ============================================================ */
@@ -403,6 +420,7 @@ body.is-welcome .dock { display: none; }
 .awaken .step-enter { animation: sys-open 560ms var(--ease-out); }
 .awaken .field { text-align: left; }
 .skip-intro { position: fixed; top: calc(12px + var(--safe-t)); right: 12px; z-index: 5; }
+.awaken .after { display: grid; gap: 16px; }
 .awaken .fade-late { animation: fade-up 300ms var(--ease-out) both; }
 
 /* ============================================================

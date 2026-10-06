@@ -9,12 +9,20 @@ XP_PER_TASK = 10
 XP_PER_PERFECT_DAY = 20
 RANKS = [(30, "S"), (20, "A"), (15, "B"), (10, "C"), (5, "D"), (1, "E")]
 
+# Every function below is scoped to one user: a Player can only ever see or change their own quests.
 
-def create_task(db: Session, task_in: schemas.TaskCreate) -> models.Task:
+
+def get_owned_task(db: Session, task_id: int, user_id: int) -> models.Task | None:
+    task = db.get(models.Task, task_id)
+    return task if task is not None and task.user_id == user_id else None
+
+
+def create_task(db: Session, task_in: schemas.TaskCreate, user_id: int) -> models.Task:
     today = date.today()
     title = task_in.title.strip()
     if task_in.is_permanent:
         task = models.Task(
+            user_id=user_id,
             title=title,
             is_permanent=True,
             specific_date=None,
@@ -23,6 +31,7 @@ def create_task(db: Session, task_in: schemas.TaskCreate) -> models.Task:
     else:
         target_date = task_in.specific_date or today
         task = models.Task(
+            user_id=user_id,
             title=title,
             is_permanent=False,
             specific_date=target_date,
@@ -34,8 +43,8 @@ def create_task(db: Session, task_in: schemas.TaskCreate) -> models.Task:
     return task
 
 
-def archive_task(db: Session, task_id: int, on: date) -> models.Task | None:
-    task = db.get(models.Task, task_id)
+def archive_task(db: Session, task_id: int, on: date, user_id: int) -> models.Task | None:
+    task = get_owned_task(db, task_id, user_id)
     if task is None:
         return None
     task.archived = True
@@ -45,8 +54,8 @@ def archive_task(db: Session, task_id: int, on: date) -> models.Task | None:
     return task
 
 
-def delete_task(db: Session, task_id: int) -> bool:
-    task = db.get(models.Task, task_id)
+def delete_task(db: Session, task_id: int, user_id: int) -> bool:
+    task = get_owned_task(db, task_id, user_id)
     if task is None:
         return False
     db.delete(task)
@@ -63,22 +72,23 @@ def _permanent_active_between(start: date, end: date):
     )
 
 
-def _tasks_for_date(db: Session, target_date: date) -> list[models.Task]:
+def _tasks_for_date(db: Session, target_date: date, user_id: int) -> list[models.Task]:
     return (
         db.query(models.Task)
         .filter(
+            models.Task.user_id == user_id,
             or_(
                 models.Task.specific_date == target_date,
                 _permanent_active_between(target_date, target_date),
-            )
+            ),
         )
         .order_by(models.Task.is_permanent.desc(), models.Task.id)
         .all()
     )
 
 
-def get_day(db: Session, target_date: date) -> schemas.DayTasks:
-    tasks = _tasks_for_date(db, target_date)
+def get_day(db: Session, target_date: date, user_id: int) -> schemas.DayTasks:
+    tasks = _tasks_for_date(db, target_date, user_id)
     task_ids = [t.id for t in tasks]
     completions = (
         db.query(models.Completion)
@@ -105,6 +115,7 @@ def get_day(db: Session, target_date: date) -> schemas.DayTasks:
 
 
 def set_completion(db: Session, task_id: int, target_date: date, completed: bool) -> models.Completion:
+    """Callers must check ownership first (see get_owned_task)."""
     completion = (
         db.query(models.Completion)
         .filter(models.Completion.task_id == task_id, models.Completion.date == target_date)
@@ -120,21 +131,30 @@ def set_completion(db: Session, task_id: int, target_date: date, completed: bool
     return completion
 
 
-def get_calendar_summary(db: Session, start: date, end: date) -> list[schemas.CalendarDay]:
+def get_calendar_summary(db: Session, start: date, end: date, user_id: int) -> list[schemas.CalendarDay]:
     all_tasks = (
         db.query(models.Task)
         .filter(
+            models.Task.user_id == user_id,
             or_(
                 and_(models.Task.specific_date >= start, models.Task.specific_date <= end),
                 _permanent_active_between(start, end),
-            )
+            ),
         )
         .all()
     )
+    task_ids = [t.id for t in all_tasks]
     completions = (
         db.query(models.Completion)
-        .filter(models.Completion.date >= start, models.Completion.date <= end, models.Completion.completed == True)  # noqa: E712
+        .filter(
+            models.Completion.task_id.in_(task_ids),
+            models.Completion.date >= start,
+            models.Completion.date <= end,
+            models.Completion.completed == True,  # noqa: E712
+        )
         .all()
+        if task_ids
+        else []
     )
     completed_pairs = {(c.task_id, c.date) for c in completions}
 
@@ -171,9 +191,15 @@ def _level_for(xp: int) -> tuple[int, int, int]:
     return level, 50 * level * (level - 1), 50 * (level + 1) * level
 
 
-def get_stats(db: Session, today: date) -> schemas.Stats:
-    first_task = db.query(models.Task).order_by(models.Task.start_date).first()
-    days = get_calendar_summary(db, first_task.start_date, today) if first_task and first_task.start_date <= today else []
+def get_stats(db: Session, today: date, user_id: int) -> schemas.Stats:
+    first_task = (
+        db.query(models.Task).filter(models.Task.user_id == user_id).order_by(models.Task.start_date).first()
+    )
+    days = (
+        get_calendar_summary(db, first_task.start_date, today, user_id)
+        if first_task and first_task.start_date <= today
+        else []
+    )
     done_by_day = {d.date: d.done for d in days}
 
     total_done = sum(d.done for d in days)
@@ -203,10 +229,14 @@ def get_stats(db: Session, today: date) -> schemas.Stats:
     )
 
 
-def get_habits(db: Session, today: date) -> list[schemas.HabitOut]:
+def get_habits(db: Session, today: date, user_id: int) -> list[schemas.HabitOut]:
     habits = (
         db.query(models.Task)
-        .filter(models.Task.is_permanent == True, models.Task.archived_on == None)  # noqa: E712,E711
+        .filter(
+            models.Task.user_id == user_id,
+            models.Task.is_permanent == True,  # noqa: E712
+            models.Task.archived_on == None,  # noqa: E711
+        )
         .order_by(models.Task.id)
         .all()
     )
@@ -234,3 +264,17 @@ def get_habits(db: Session, today: date) -> list[schemas.HabitOut]:
         )
         for h in habits
     ]
+
+
+# ---------- accounts ----------
+def create_user(db: Session, username: str, password_hash: str, now) -> models.User:
+    first_user = db.query(models.User).first() is None
+    user = models.User(username=username, password_hash=password_hash, created_at=now)
+    db.add(user)
+    db.flush()
+    if first_user:
+        # quests made before accounts existed belong to whoever sets the app up
+        db.query(models.Task).filter(models.Task.user_id == None).update({"user_id": user.id})  # noqa: E711
+    db.commit()
+    db.refresh(user)
+    return user

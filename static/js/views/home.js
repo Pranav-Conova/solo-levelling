@@ -2,8 +2,7 @@ import { api, changed } from "../api.js";
 import { openAdd } from "../add.js";
 import { goalRowHTML, openQuest, paintGoalRow, toggleDone } from "../quest.js";
 import {
-  addDays, esc, fmt, heat, icon, makeWindow, openDialog, particles, plural, pref, reducedMotion,
-  replayClass, setPref, toast, todayISO, typewrite, winHead, wireClose, withUndo,
+  addDays, esc, fmt, heat, icon, makeWindow, openDialog, particles, playerPref, plural, reducedMotion, replayClass, setPlayerPref, toast, todayISO, typewrite, userName, winHead, wireClose, withUndo,
 } from "../util.js";
 
 export const title = "Quest Info";
@@ -138,8 +137,8 @@ export function mount(el) {
 
   // ---------- System events ----------
   function rewards() {
-    if (!alive || pref("rewarded") === date) return;
-    setPref("rewarded", date);
+    if (!alive || playerPref("rewarded") === date) return;
+    setPlayerPref("rewarded", date);
     const tasks = visible();
     const exp = tasks.length * 10 + 20;
     const dlg = makeWindow("Quest complete");
@@ -163,8 +162,8 @@ export function mount(el) {
   function penaltyCheck() {
     const yesterday = addDays(date, -1);
     const y = week.find((d) => d.date === yesterday);
-    if (!y || !y.total || y.done === y.total || pref("penalty-seen") === yesterday) return;
-    setPref("penalty-seen", yesterday);
+    if (!y || !y.total || y.done === y.total || playerPref("penalty-seen") === yesterday) return;
+    setPlayerPref("penalty-seen", yesterday);
     const dlg = makeWindow("Penalty");
     dlg.innerHTML = `
       <div class="win-body sys penalty">
@@ -175,7 +174,7 @@ export function mount(el) {
           <p>Perfect-day bonus lost <b style="color:var(--danger);text-shadow:none">-20 EXP</b></p>
           ${y.done === 0 ? `<p>Your streak has been <b style="color:var(--danger);text-shadow:none">reset</b>.</p>` : ""}
         </div>
-        <p class="win-warn">Do not fail again, ${esc(pref("name", "Hunter"))}.</p>
+        <p class="win-warn">Do not fail again, ${esc(userName())}.</p>
         <button class="btn btn-sys btn-block" type="button" data-close>I understand</button>
       </div>`;
     wireClose(dlg);
