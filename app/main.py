@@ -233,6 +233,6 @@ def get_stats(today: Optional[date] = None, db: Session = Depends(get_db), user:
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
 
-@app.get("/")
+@app.api_route("/", methods=["GET", "HEAD"])  # Render probes the root with HEAD
 def index():
     return FileResponse("static/index.html", headers={"Cache-Control": "no-cache"})
