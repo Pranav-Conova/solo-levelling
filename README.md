@@ -60,8 +60,10 @@ By default it uses a local SQLite file (`tracker.db`). Set `DATABASE_URL` to a P
 ## Deploy to Render
 
 1. Push this repo to GitHub.
-2. In Render, choose "New +" → "Blueprint" and point it at this repo. It reads `render.yaml`.
-3. **Important (persistence):** Render's free web service disk is ephemeral and gets wiped on redeploy or restart. To keep your data, create a free Render PostgreSQL instance and set the web service's `DATABASE_URL` env var to its connection string.
+2. In Render, choose "New +" → "Blueprint" and point it at this repo. It reads `render.yaml`. If you create a plain Web Service instead, set the start command to `uvicorn app.main:app --host 0.0.0.0 --port $PORT`, the health check path to `/api/health`, and the env vars yourself. Python is pinned by `.python-version`.
+3. **Database: SQLite for now.** With no `DATABASE_URL`, the app stores everything in `tracker.db`. On Render's free plan the disk is temporary, so **that file, and every account and quest in it, is reset on each deploy or restart.** Setting `PING_URL` avoids the idle restarts, but deploys still wipe it.
+   - To keep SQLite data: add a persistent disk (paid plan), for example mounted at `/var/data`, and set `DATABASE_URL=sqlite:////var/data/tracker.db`.
+   - Or switch to Postgres later by setting `DATABASE_URL` to its connection string. The tables are created automatically.
 4. Deploy.
 
 ## Tests

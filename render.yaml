@@ -9,8 +9,10 @@ services:
     envVars:
       - key: PYTHON_VERSION
         value: 3.12.8
-      - key: DATABASE_URL
-        sync: false
+      # No DATABASE_URL: the app uses SQLite (tracker.db in the project folder).
+      # The free plan's disk is temporary, so that file is reset on every deploy/restart.
+      # To keep data: add a Render disk (paid plan) and set DATABASE_URL=sqlite:////var/data/tracker.db,
+      # or point DATABASE_URL at a Postgres database.
       # set to "false" after creating your own account so strangers can't sign up
       - key: ALLOW_REGISTRATION
         value: "true"
