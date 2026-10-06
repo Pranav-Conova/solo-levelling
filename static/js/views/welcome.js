@@ -25,14 +25,24 @@ export function mount(el) {
   document.body.classList.add("is-welcome");
   let alive = true;
   let timer;
+  let current = 0; // bumps on every step so an interrupted step stops where it is
 
-  el.innerHTML = `<div class="awaken"><div data-stage></div></div>`;
+  el.innerHTML = `
+    <div class="awaken">
+      <button class="btn btn-text skip-intro" type="button" data-skip>Skip intro</button>
+      <div data-stage></div>
+    </div>`;
   const stage = el.querySelector("[data-stage]");
+  const skipBtn = el.querySelector("[data-skip]");
+  skipBtn.addEventListener("click", () => { clearTimeout(timer); show("name"); });
 
   async function show(key) {
     if (!alive) return;
+    const mine = ++current;
+    clearTimeout(timer);
     if (key === "done") { setPref("awakened", "1"); location.hash = "#/"; return; }
     const step = STEPS[key];
+    skipBtn.hidden = key === "name" || key === "quest"; // the name step can't be skipped: Status needs it
     stage.innerHTML = `
       <section class="sys sys-window step-enter${step.penalty ? " penalty" : ""}" aria-live="polite">
         <div class="win-head">
@@ -59,8 +69,9 @@ export function mount(el) {
 
     // let the window unfold before the System starts "speaking"
     await new Promise((r) => setTimeout(r, reducedMotion() ? 0 : 500));
+    if (mine !== current) return;
     await typewrite(stage.querySelector("[data-text]"), step.text);
-    if (!alive) return;
+    if (!alive || mine !== current) return;
 
     if (step.auto) { timer = setTimeout(() => show(step.auto), reducedMotion() ? 600 : 1200); return; }
     const after = stage.querySelector("[data-after]");
@@ -71,7 +82,9 @@ export function mount(el) {
 
   stage.addEventListener("click", (e) => {
     const next = e.target.closest("[data-next]");
-    if (next) show(next.dataset.next);
+    if (next) { show(next.dataset.next); return; }
+    // tapping the window while the System is "speaking" reveals the whole line
+    if (!e.target.closest("button, input")) stage.querySelector("[data-text]")?._finish?.();
   });
   stage.addEventListener("submit", (e) => {
     e.preventDefault();

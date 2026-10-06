@@ -140,12 +140,21 @@ export function typewrite(el, text, speed = 28) {
   el.classList.remove("is-done");
   return new Promise((resolve) => {
     let i = 0;
+    let timer;
+    const finish = () => {
+      clearTimeout(timer);
+      el.textContent = text;
+      el.classList.add("is-done");
+      el._finish = null;
+      resolve();
+    };
     const tick = () => {
       if (!el.isConnected) return resolve();
       el.textContent = text.slice(0, ++i);
-      if (i < text.length) setTimeout(tick, speed);
-      else { el.classList.add("is-done"); resolve(); }
+      if (i < text.length) timer = setTimeout(tick, speed);
+      else finish();
     };
+    el._finish = finish; // lets a tap reveal the whole line at once
     tick();
   });
 }

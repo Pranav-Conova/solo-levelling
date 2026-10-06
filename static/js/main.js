@@ -1,6 +1,6 @@
 import { api } from "./api.js";
 import { openAdd } from "./add.js";
-import { esc, initial, makeWindow, openDialog, particles, pref, replayClass, userName, winHead, wireClose } from "./util.js";
+import { esc, initial, makeWindow, openDialog, particles, pref, replayClass, toast, userName, winHead, wireClose } from "./util.js";
 import * as home from "./views/home.js";
 import * as calendar from "./views/calendar.js";
 import * as profile from "./views/profile.js";
@@ -81,6 +81,10 @@ document.addEventListener("tracker:changed", (e) => {
   clearTimeout(statsTimer);
   statsTimer = setTimeout(checkLevel, 300);
 });
+
+// tell the Player when saving can't work (offline-support)
+addEventListener("offline", () => toast("Connection to the System lost. Changes won't be saved until you're back online.", { tone: "error", duration: 6000 }));
+addEventListener("online", () => toast("Connection to the System restored."));
 
 renderAvatar();
 route();

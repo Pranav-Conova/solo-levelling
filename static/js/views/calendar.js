@@ -78,6 +78,7 @@ export function mount(el, arg) {
         <span class="tile-num">${parseISO(d).getDate()}</span>
         ${lvl === 3 ? icon("check", "tile-check") : ""}
         <span class="tile-count" aria-hidden="true">${s && s.total && d <= today ? `${s.done}/${s.total}` : ""}</span>
+        ${s && s.total && s.done && d <= today ? `<i class="tile-bar" style="--p:${s.done / s.total}" aria-hidden="true"></i>` : ""}
       </button>`;
   }
 

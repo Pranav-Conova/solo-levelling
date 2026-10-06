@@ -25,9 +25,9 @@
   --focus: var(--blue);
 
   --heat-0: transparent;
-  --heat-1: rgba(30, 123, 255, .28);
-  --heat-2: rgba(30, 123, 255, .6);
-  --heat-3: var(--blue);
+  --heat-1: #0F2F63;        /* light text on these stays >= 4.5:1 */
+  --heat-2: #1F5FD0;
+  --heat-3: var(--blue);    /* paired with ink text */
 
   --font-sys: "Rajdhani", "Segoe UI", Roboto, sans-serif;
 
@@ -50,7 +50,13 @@
    Base
    ============================================================ */
 *, *::before, *::after { box-sizing: border-box; }
-html { -webkit-text-size-adjust: 100%; background: var(--bg); }
+html {
+  -webkit-text-size-adjust: 100%;
+  background: var(--bg);
+  /* keyboard focus and in-page jumps stop clear of the floating dock */
+  scroll-padding-top: 16px;
+  scroll-padding-bottom: calc(var(--dock-space) + 12px);
+}
 body {
   margin: 0;
   min-height: 100dvh;
@@ -63,6 +69,8 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 h1, h2, h3, p { margin: 0; }
+p { line-height: 1.5; }
+h1, h2, h3, .win-lead { text-wrap: balance; }
 ul { margin: 0; padding: 0; list-style: none; }
 a { color: inherit; text-decoration: none; }
 button, input { font: inherit; color: inherit; }
@@ -284,7 +292,7 @@ button.goal-name:hover { color: #fff; text-shadow: var(--text-glow); }
 .btn-text:hover { text-shadow: var(--text-glow); }
 .btn-danger { color: var(--danger); }
 .btn-block { width: 100%; }
-.btn-sm { min-height: 40px; padding: 0 14px; font-size: 15px; }
+.btn-sm { min-height: 44px; padding: 0 14px; font-size: 15px; }
 
 .icon-btn {
   display: inline-grid;
@@ -339,27 +347,44 @@ input[type="date"].input { color-scheme: dark; }
 .dock-item {
   display: grid;
   place-items: center;
-  width: 56px;
-  height: 48px;
+  align-content: center;
+  gap: 2px;
+  width: 68px;
+  min-height: 56px;
+  padding: 4px 0;
   color: var(--text-2);
   transition: color var(--dur-fast), background-color var(--dur-fast), transform var(--dur-press) var(--ease-out);
 }
 .dock-item:hover { color: var(--text); }
-.dock-item:active { transform: scale(.9); }
+.dock-item:active { transform: scale(.94); }
 .dock-item[aria-current="page"] { color: var(--blue); background: rgba(76, 196, 255, .14); }
 .dock-item[aria-current="page"] .icon { filter: drop-shadow(0 0 6px var(--blue)); }
+.dock-label { font-size: 12px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; line-height: 1; }
 .dock-avatar {
   display: grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
-  border: 1px solid var(--line);
+  width: 24px;
+  height: 24px;
+  border: 1px solid currentColor;
   font-weight: 700;
-  font-size: 16px;
-  color: var(--text);
+  font-size: 14px;
   text-transform: uppercase;
 }
-.dock-item[aria-current="page"] .dock-avatar { box-shadow: 0 0 10px var(--blue); color: var(--blue); }
+.dock-item[aria-current="page"] .dock-avatar { box-shadow: 0 0 10px var(--blue); }
+
+/* large screens and landscape phones: the dock becomes a side rail so it never covers content */
+@media (min-width: 1024px), (orientation: landscape) and (max-height: 500px) {
+  :root { --dock-space: 32px; }
+  html { scroll-padding-bottom: 16px; }
+  main { padding-left: 100px; }
+  .dock { left: 16px; top: 50%; bottom: auto; flex-direction: column; transform: translateY(-50%); animation-name: rail-in; }
+}
+@media (orientation: landscape) and (max-height: 500px) {
+  .dock { top: calc(8px + var(--safe-t)); transform: none; gap: 2px; padding: 4px; animation: none; }
+  .dock-item { min-height: 48px; }
+  /* no room for text: keep the label for screen readers only */
+  .dock-label { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+}
 body.is-welcome .dock { display: none; }
 
 /* ============================================================
@@ -377,6 +402,7 @@ body.is-welcome .dock { display: none; }
 .awaken-actions.single { grid-template-columns: 1fr; }
 .awaken .step-enter { animation: sys-open 560ms var(--ease-out); }
 .awaken .field { text-align: left; }
+.skip-intro { position: fixed; top: calc(12px + var(--safe-t)); right: 12px; z-index: 5; }
 .awaken .fade-late { animation: fade-up 300ms var(--ease-out) both; }
 
 /* ============================================================
@@ -513,6 +539,7 @@ dialog.win.is-closing .win-body { animation: sys-close 220ms var(--ease-in) forw
 .cal-section { padding: 20px 16px; }
 @media (min-width: 768px) { .cal-section { padding: 24px; } }
 .cal-head { display: flex; align-items: center; gap: 4px; margin-bottom: 14px; }
+.cal-head .icon-btn { flex: none; }
 .cal-head h2 { margin-right: auto; font-size: 22px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; text-shadow: var(--text-glow); }
 .cal-weekdays, .cal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 6px; }
 .cal-weekdays { margin-bottom: 6px; text-align: center; }
@@ -548,9 +575,15 @@ dialog.win.is-closing .win-body { animation: sys-close 220ms var(--ease-in) forw
 .tile[aria-pressed="true"] { outline: 2px solid var(--text); outline-offset: 2px; }
 .tile .tile-count { font-size: 12px; font-weight: 600; opacity: .9; }
 .tile .tile-check { position: absolute; right: 5px; top: 5px; width: 14px; height: 14px; stroke-width: 3; }
+/* a fill bar shows how much of the day was cleared without relying on colour */
+.tile-bar { position: absolute; left: 3px; right: 3px; bottom: 3px; height: 3px; background: var(--blue); box-shadow: 0 0 6px var(--blue); transform-origin: left; transform: scaleX(var(--p, 0)); }
+.tile.h2 .tile-bar { background: #fff; box-shadow: none; }
+.tile.h3 .tile-bar { display: none; }
 @media (max-width: 420px) {
-  .cal-grid, .cal-weekdays { gap: 4px; }
-  .tile { padding: 3px 4px; font-size: 14px; }
+  .page { padding-left: 12px; padding-right: 12px; }
+  .cal-section { padding: 16px 10px; }
+  .cal-grid, .cal-weekdays { gap: 3px; }
+  .tile { min-height: 44px; padding: 3px 4px; font-size: 14px; }
   .tile .tile-count { display: none; }
   .tile .tile-check { right: 3px; top: 3px; width: 11px; height: 11px; }
 }
@@ -699,6 +732,7 @@ dialog.win .daybox-head { padding-right: 40px; }
 @keyframes caret { 50% { opacity: 0; } }
 @keyframes flicker { 0% { opacity: 0; } 10% { opacity: 1; } 15% { opacity: .3; } 25% { opacity: 1; } 32% { opacity: .5; } 40%, 100% { opacity: 1; } }
 @keyframes dock-in { from { opacity: 0; transform: translate(-50%, 24px); } }
+@keyframes rail-in { from { opacity: 0; transform: translate(-24px, -50%); } }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

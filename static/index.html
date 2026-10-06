@@ -10,7 +10,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@500;600;700&display=swap" />
-  <link rel="stylesheet" href="/static/style.css?v=4" />
+  <link rel="stylesheet" href="/static/style.css?v=5" />
 </head>
 <body>
   <svg width="0" height="0" style="position:absolute" aria-hidden="true">
@@ -47,14 +47,14 @@
   </main>
 
   <nav class="dock" aria-label="Primary">
-    <a class="dock-item" href="#/" data-route="" aria-label="Daily quests"><svg class="icon" aria-hidden="true"><use href="#i-home" /></svg></a>
-    <a class="dock-item" href="#/calendar" data-route="calendar" aria-label="Quest log"><svg class="icon" aria-hidden="true"><use href="#i-calendar" /></svg></a>
-    <button class="dock-item" type="button" data-open-add aria-label="New quest"><svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg></button>
-    <a class="dock-item" href="#/profile" data-route="profile" aria-label="Status"><span class="dock-avatar" data-avatar aria-hidden="true"></span></a>
+    <a class="dock-item" href="#/" data-route=""><svg class="icon" aria-hidden="true"><use href="#i-home" /></svg><span class="dock-label">Quests</span></a>
+    <a class="dock-item" href="#/calendar" data-route="calendar"><svg class="icon" aria-hidden="true"><use href="#i-calendar" /></svg><span class="dock-label">Log</span></a>
+    <button class="dock-item" type="button" data-open-add><svg class="icon" aria-hidden="true"><use href="#i-plus" /></svg><span class="dock-label">New</span></button>
+    <a class="dock-item" href="#/profile" data-route="profile"><span class="dock-avatar" data-avatar aria-hidden="true"></span><span class="dock-label">Status</span></a>
   </nav>
 
   <div class="toasts" role="status" aria-live="polite"></div>
 
-  <script type="module" src="/static/js/main.js?v=4"></script>
+  <script type="module" src="/static/js/main.js?v=5"></script>
 </body>
 </html>
