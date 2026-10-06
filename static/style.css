@@ -60,6 +60,7 @@ html {
 }
 body {
   margin: 0;
+  min-height: 100vh;
   min-height: 100dvh;
   background: var(--bg);
   color: var(--text);
@@ -315,10 +316,10 @@ dialog.win .win-head { padding: 0 34px; }
 
 /* ---------- quest details window ---------- */
 .quest-title { text-align: center; font-size: 26px; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; text-shadow: var(--text-glow); }
-.quest-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 0; border: 1px solid var(--line-dim); background: var(--line-dim); }
+.quest-facts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1px; margin: 0; border: 1px solid var(--line-dim); background: var(--line-dim); }
 .quest-facts div { padding: 10px 12px; background: rgba(2, 9, 22, .95); }
 .quest-facts dt { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--text-3); }
-.quest-facts dd { margin: 2px 0 0; font-size: 17px; font-weight: 600; }
+.quest-facts dd { margin: 2px 0 0; font-size: 17px; font-weight: 600; overflow-wrap: anywhere; }
 .quest-status { display: flex; justify-content: center; align-items: center; gap: 6px; font-size: 18px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); }
 .quest-status .icon { width: 20px; height: 20px; stroke-width: 3; }
 .quest-status.is-done { color: var(--blue); text-shadow: var(--text-glow); }
@@ -476,12 +477,13 @@ body.is-welcome .dock { display: none; }
 .awaken {
   display: grid;
   place-items: center;
+  min-height: 100vh;
   min-height: 100dvh;
   padding: calc(20px + var(--safe-t)) 16px calc(20px + var(--safe-b));
 }
 .awaken .sys-window { width: min(520px, 100%); text-align: center; }
 .awaken .win-lead { font-size: 21px; min-height: 3.2em; }
-.awaken-actions { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.awaken-actions { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
 .awaken-actions.single { grid-template-columns: 1fr; }
 .awaken .step-enter { animation: sys-open 560ms var(--ease-out); }
 .awaken .field { text-align: left; }
@@ -541,14 +543,20 @@ body.is-welcome .dock { display: none; }
    Dialog windows
    ============================================================ */
 dialog.win {
-  width: min(480px, calc(100% - 32px));
-  max-height: calc(100dvh - 40px);
+  /* the dialog itself scrolls; its padding leaves room for the window's corner brackets and glow,
+     so nothing pokes out sideways and the window never wobbles left/right on touch screens */
+  width: min(512px, 100%);
+  max-width: 100%;
+  max-height: 100vh;
+  max-height: 100dvh;
   margin: auto;
-  padding: 0;
+  padding: 16px;
   border: 0;
   background: transparent;
   color: var(--text);
-  overflow: visible;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
 }
 dialog.win::backdrop {
   background: rgba(1, 4, 11, .6);
@@ -560,10 +568,7 @@ dialog.win.is-closing::backdrop { animation: fade-out var(--dur-fast) var(--ease
 .win-body {
   display: grid;
   gap: 18px;
-  max-height: calc(100dvh - 40px);
   padding: 24px 20px 24px;
-  overflow-y: auto;
-  overscroll-behavior: contain;
 }
 dialog.win[open] .win-body { animation: sys-open 520ms var(--ease-out); }
 dialog.win[open] .win-body > * { animation: fade-up 340ms var(--ease-out) 280ms both; }
@@ -577,7 +582,7 @@ dialog.win.is-closing .win-body { animation: sys-close 220ms var(--ease-in) forw
 .reward-list b { color: var(--blue); text-shadow: var(--text-glow); }
 
 /* segmented control */
-.segmented { position: relative; display: grid; grid-template-columns: 1fr 1fr; padding: 4px; border: 1px solid var(--line-dim); background: rgba(1, 4, 11, .5); }
+.segmented { position: relative; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); padding: 4px; border: 1px solid var(--line-dim); background: rgba(1, 4, 11, .5); }
 .segmented input { position: absolute; opacity: 0; pointer-events: none; }
 .segmented label {
   position: relative; z-index: 1;
@@ -603,7 +608,7 @@ dialog.win.is-closing .win-body { animation: sys-close 220ms var(--ease-in) forw
    ============================================================ */
 .page-title { display: flex; justify-content: center; margin-bottom: 26px; }
 .page-title .win-head { padding: 0; }
-.cal-page { display: grid; gap: 28px; }
+.cal-page { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; }
 @media (min-width: 1024px) { .cal-page { grid-template-columns: minmax(0, 1fr) 400px; align-items: start; } }
 .cal-section { padding: 20px 16px; }
 @media (min-width: 768px) { .cal-section { padding: 24px; } }
@@ -661,10 +666,10 @@ dialog.win.is-closing .win-body { animation: sys-close 220ms var(--ease-in) forw
 .legend i.h1 { background: var(--heat-1); }
 .legend i.h2 { background: var(--heat-2); }
 .legend i.h3 { background: var(--heat-3); }
-.month-stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-top: 18px; }
+.month-stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 18px; }
 .month-stat { display: grid; padding: 10px; border: 1px solid var(--line-dim); }
 .month-stat strong { font-size: 28px; font-weight: 700; text-shadow: var(--text-glow); }
-.month-stat span { font-size: 14px; color: var(--text-2); }
+.month-stat span { font-size: 14px; color: var(--text-2); overflow-wrap: anywhere; }
 
 .day-panel { display: none; position: sticky; top: 44px; }
 @media (min-width: 1024px) { .day-panel { display: block; } }
@@ -675,6 +680,9 @@ dialog.win.is-closing .win-body { animation: sys-close 220ms var(--ease-in) forw
 dialog.win .daybox-head { padding-right: 40px; }
 .note { font-size: 15px; color: var(--text-2); padding: 10px 12px; border: 1px dashed var(--line-dim); }
 .quick-add { display: flex; gap: 8px; }
+/* inputs have a wide intrinsic size; let them shrink so the form fits the narrowest phones */
+.quick-add .input { flex: 1; min-width: 0; }
+.daybox { grid-template-columns: minmax(0, 1fr); }
 
 /* ============================================================
    Status window
@@ -683,7 +691,8 @@ dialog.win .daybox-head { padding-right: 40px; }
 .status-top { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 14px 18px; align-items: start; }
 .status-lines { display: grid; gap: 6px; font-size: 19px; }
 .status-lines .k { font-weight: 700; letter-spacing: .1em; color: var(--text-2); }
-.status-lines .v { font-weight: 700; color: var(--text); }
+.status-lines .v { font-weight: 700; color: var(--text); overflow-wrap: anywhere; min-width: 0; }
+.status-lines > div { min-width: 0; }
 .status-name { display: flex; align-items: center; gap: 2px; flex-wrap: wrap; }
 .status-name form { display: flex; gap: 6px; flex-wrap: wrap; }
 .status-level { display: grid; justify-items: center; align-content: center; min-width: 96px; padding: 8px 10px; border: 1px solid var(--line); box-shadow: inset 0 0 18px rgba(30, 123, 255, .4), 0 0 10px rgba(30, 123, 255, .35); }
@@ -692,7 +701,7 @@ dialog.win .daybox-head { padding-right: 40px; }
 .bar-row { display: grid; grid-template-columns: 44px minmax(0, 1fr) auto; gap: 10px; align-items: center; }
 .bar-row .k { font-weight: 700; letter-spacing: .08em; }
 .bar-row .v { font-size: 15px; color: var(--text-2); font-variant-numeric: tabular-nums; }
-.stat-list { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 24px; }
+.stat-list { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 24px; }
 .stat-line { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; padding: 8px 0; border-bottom: 1px solid var(--line-dim); }
 .stat-line .k { font-weight: 700; letter-spacing: .12em; font-size: 21px; }
 .stat-line .v { font-size: 27px; font-weight: 700; font-variant-numeric: tabular-nums; text-shadow: var(--text-glow); }
@@ -813,4 +822,48 @@ dialog.win .daybox-head { padding-right: 40px; }
     transition-duration: .01ms !important;
     scroll-behavior: auto !important;
   }
+}
+
+
+/* ============================================================
+   Small phones (checked at 280-430px wide and in landscape)
+   ============================================================ */
+@media (max-width: 420px) {
+  /* day tiles: a square 44px tile doesn't fit a 37px column, so let them be taller than wide */
+  .tile { aspect-ratio: auto; min-height: 46px; }
+  .cal-head h2 { font-size: 19px; }
+}
+@media (max-width: 400px) {
+  .sys-window { padding: 22px 14px 20px; }
+  .win-body { padding: 22px 14px; }
+  .win-head { gap: 6px; }
+  .win-head .box { padding: 0 12px; letter-spacing: .08em; }
+  .goal-toggle { padding-left: 4px; gap: 10px; }
+  .goal-name { font-size: 18px; }
+  .status-level { min-width: 78px; }
+  .status-level strong { font-size: 46px; }
+  .stat-list { gap: 4px 16px; }
+}
+@media (max-width: 340px) {
+  .month-stats { gap: 6px; }
+  .month-stat { padding: 8px 6px; }
+  .month-stat strong { font-size: 22px; }
+  dialog.win { padding: 10px; }
+  .win-head .box.icon-box, .segmented .icon { display: none; } /* decorative; titles need the room */
+  .win-head .box { min-width: 0; white-space: normal; text-align: center; text-wrap: balance; }
+  .dock { gap: 0; padding: 4px; }
+  .dock-item { width: 58px; }
+  .page { padding-left: 10px; padding-right: 10px; }
+}
+/* short screens (landscape phones): tighter vertical rhythm so windows need less scrolling */
+@media (max-height: 500px) {
+  .win-body, .sys-window { gap: 12px; padding-top: 16px; padding-bottom: 16px; }
+  .win-head .box { min-height: 38px; }
+  .goal-title { font-size: 24px; }
+  .goal-toggle { min-height: 56px; }
+}
+/* touch screens keep :hover after a tap; don't leave tiles "lifted" */
+@media (hover: none) {
+  .tile:hover, .day-cell:hover { transform: none; }
+  .week a:hover i { transform: none; }
 }
