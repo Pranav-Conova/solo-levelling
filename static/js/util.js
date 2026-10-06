@@ -53,7 +53,6 @@ export const initial = (title) => (title.trim().match(/[\p{L}\p{N}]/u) || ["?"])
 export const icon = (name, cls = "") =>
   `<svg class="icon ${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
 
-export const statusText = (t) => (t.completed ? "[Complete]" : "[Incomplete]");
 export const questKind = (t) => (t.is_permanent ? "Daily Quest" : "Personal Added");
 
 // heat level 0-3 for a day's completion ratio

@@ -1,8 +1,8 @@
 import { api, changed } from "../api.js";
 import { openAdd } from "../add.js";
-import { goalRowHTML, openQuest, paintGoalRow, toggleDone } from "../quest.js";
+import { goalRowHTML, openQuest, paintGoalRow, paintProgress, progressHTML, toggleDone } from "../quest.js";
 import {
-  addDays, esc, fmt, heat, icon, makeWindow, openDialog, particles, playerPref, plural, reducedMotion, replayClass, setPlayerPref, toast, todayISO, typewrite, userName, winHead, wireClose, withUndo,
+  addDays, esc, fmt, heat, icon, makeWindow, openDialog, particles, playerPref, plural, reducedMotion, setPlayerPref, toast, todayISO, typewrite, userName, winHead, wireClose, withUndo,
 } from "../util.js";
 
 export const title = "Quest Info";
@@ -12,6 +12,7 @@ export function mount(el) {
   let day = null;
   let stats = null;
   let week = [];
+  let habits = new Map(); // Daily Quest id -> { streak, completed_today, total_done, ... }
   let alive = true;
 
   el.innerHTML = `
@@ -23,14 +24,14 @@ export function mount(el) {
             <h1 class="box" id="qi-title">Quest Info</h1>
           </div>
           <p class="win-lead" data-lead>&nbsp;</p>
+          ${progressHTML()}
           <h2 class="goal-title">Goal</h2>
-          <ul class="goal-list" data-daily>
-            ${'<li class="skeleton" style="height:44px;margin:4px 0"></li>'.repeat(3)}
+          <ul class="goal-list" data-daily aria-label="Daily quests">
+            ${'<li class="skeleton" style="height:68px;margin:2px 0"></li>'.repeat(3)}
           </ul>
           <div data-personal hidden>
-            <div class="win-divider" style="margin:4px 0 14px"></div>
-            <p class="sub-title" style="text-align:center;margin-bottom:6px">Personal quests</p>
-            <ul class="goal-list" data-once></ul>
+            <p class="sub-title" style="text-align:center;margin:6px 0 10px">Personal quests</p>
+            <ul class="goal-list" data-once aria-label="Personal quests"></ul>
           </div>
           <p class="win-warn" data-warn></p>
           <p class="reset-timer">Time until reset: <b data-timer>--:--:--</b></p>
@@ -66,7 +67,7 @@ export function mount(el) {
     const daily = tasks.filter((t) => t.is_permanent);
     const once = tasks.filter((t) => !t.is_permanent);
     dailyEl.innerHTML = daily.length
-      ? daily.map((t, i) => goalRowHTML(t, i)).join("")
+      ? daily.map((t, i) => goalRowHTML(t, i, { info: habits.get(t.id) })).join("")
       : `<li class="empty-line">${tasks.length ? "No daily quests yet." : "No quests have arrived yet."}</li>`;
     personalEl.hidden = !once.length;
     onceEl.innerHTML = once.map((t, i) => goalRowHTML(t, daily.length + i)).join("");
@@ -77,26 +78,41 @@ export function mount(el) {
   function renderWarn() {
     const tasks = visible();
     if (!tasks.length) {
+      paintProgress(el, tasks);
       warnEl.innerHTML = `Accept a quest to begin. <button class="btn btn-primary btn-block" type="button" data-first style="margin-top:12px">Create a quest</button>`;
       return;
     }
-    const left = tasks.filter((t) => !t.completed).length;
-    warnEl.innerHTML = left
-      ? `<b>WARNING:</b> Failure to complete the daily quest will result in an appropriate penalty. <span style="color:var(--text-2)">(${plural(left, "quest")} left)</span>`
+    paintProgress(el, tasks);
+    warnEl.innerHTML = tasks.some((t) => !t.completed)
+      ? `<b>WARNING:</b> Failure to complete the daily quest will result in an appropriate penalty.`
       : `[The Daily Quest has been completed.]`;
   }
 
   function findTask(id) { return day.tasks.find((t) => t.id === Number(id)); }
   function rowFor(id) { return el.querySelector(`.goal-row[data-id="${id}"]`); }
 
+  // keep today's streak in step with the checkbox without waiting for the server
+  function syncStreak(t) {
+    const info = habits.get(t.id);
+    if (!info || info.completed_today === t.completed) return;
+    info.completed_today = t.completed;
+    info.streak = Math.max(0, info.streak + (t.completed ? 1 : -1));
+    info.total_done = Math.max(0, info.total_done + (t.completed ? 1 : -1));
+  }
+
+  function repaint(t) {
+    syncStreak(t);
+    const row = rowFor(t.id);
+    if (row) paintGoalRow(row, t, habits.get(t.id));
+    renderWarn();
+  }
+
   async function toggle(t, row) {
     const wasClear = allClear();
     const saving = toggleDone(t, date, { source: "home", el: row });
-    paintGoalRow(row, t);
-    if (t.completed) replayClass(row, "flash");
-    renderWarn();
+    repaint(t);
     if (!wasClear && allClear()) setTimeout(rewards, 900);
-    if (!(await saving)) { paintGoalRow(row, t); renderWarn(); }
+    if (!(await saving)) repaint(t);
   }
 
   el.addEventListener("click", (e) => {
@@ -109,7 +125,8 @@ export function mount(el) {
       const wasClear = allClear();
       openQuest(t, date, {
         source: "home",
-        onToggle: () => { const row = rowFor(t.id); if (row) paintGoalRow(row, t); renderWarn(); },
+        info: habits.get(t.id),
+        onToggle: () => repaint(t),
         onClose: () => { if (alive && !wasClear && allClear()) rewards(); },
         onRemove: removeQuest,
       });
@@ -210,9 +227,10 @@ export function mount(el) {
   // ---------- data ----------
   async function load(first = false) {
     try {
-      const [d, s, w] = await Promise.all([api.day(date), api.stats(), api.calendar(addDays(date, -6), date)]);
+      const [d, s, w, h] = await Promise.all([api.day(date), api.stats(), api.calendar(addDays(date, -6), date), api.habits()]);
       if (!alive) return;
       day = d; stats = s; week = w;
+      habits = new Map(h.map((x) => [x.id, x]));
       renderGoals(!first);
       renderSide();
       if (first) {

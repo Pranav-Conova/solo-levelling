@@ -9,6 +9,7 @@
   --blue: #4CC4FF;          /* frame + accents (10:1 against ink) */
   --blue-deep: #1E7BFF;
   --red: #FF4D5E;           /* penalty windows */
+  --streak: #FFB547;        /* warm streak amber (10:1 on the panels) */
   --on-accent: #01040B;
 
   --bg: var(--ink);
@@ -217,46 +218,111 @@ dialog.win .win-head { padding: 0 34px; }
 }
 .sub-title { justify-self: center; font-size: 15px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--text-2); }
 
+/* ---------- quest rows: the whole row is the checkbox; ⋮ opens details ---------- */
 .goal-list { display: grid; }
 .goal-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 44px;
+  grid-template-columns: minmax(0, 1fr) 44px;
   align-items: center;
-  gap: 10px;
-  min-height: 52px;
+  gap: 8px;
+  border-top: 1px solid var(--line-dim);
   animation: rise var(--dur-slow) var(--ease-out) both;
-  animation-delay: calc(min(var(--i, 0), 10) * 70ms);
+  animation-delay: calc(min(var(--i, 0), 10) * 60ms);
 }
-.goal-name {
-  min-height: 44px;
-  padding: 0 4px;
+.goal-row:last-child { border-bottom: 1px solid var(--line-dim); }
+.goal-toggle {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 28px;
+  align-items: center;
+  gap: 14px;
+  min-height: 68px;
+  padding: 10px 8px 10px 10px;
   text-align: left;
+  overflow: hidden;
+  transition: background-color var(--dur-fast) var(--ease-out);
+}
+@media (hover: hover) { .goal-toggle:hover:not(:disabled) { background: rgba(76, 196, 255, .07); } }
+.goal-toggle:active:not(:disabled) { background: rgba(76, 196, 255, .14); }
+.goal-toggle:disabled { cursor: default; }
+.goal-toggle::before {
+  /* light sweep when a quest is cleared */
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(100deg, transparent 30%, rgba(76, 196, 255, .3) 50%, transparent 70%);
+  transform: translateX(-110%);
+  pointer-events: none;
+}
+.goal-row.just-done .goal-toggle::before { animation: sweep 800ms var(--ease-out); }
+
+.goal-text { display: block; min-width: 0; }
+.goal-name {
+  /* inline so the strike line follows every wrapped line */
+  display: inline;
   font-size: 20px;
   font-weight: 600;
+  line-height: 1.3;
   overflow-wrap: anywhere;
-  transition: color var(--dur-fast), text-shadow var(--dur-fast);
+  background-image: linear-gradient(var(--blue), var(--blue));
+  background-repeat: no-repeat;
+  background-position: 0 58%;
+  background-size: 0% 2px;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  transition: background-size 420ms var(--ease-out), color var(--dur-base);
 }
-button.goal-name:hover { color: #fff; text-shadow: var(--text-glow); }
-.status-text { font-size: 16px; font-weight: 700; letter-spacing: .04em; white-space: nowrap; color: var(--text-2); }
-.status-text.bump { animation: bump var(--dur-slow) var(--ease-spring); }
-.is-done .status-text { color: var(--blue); text-shadow: var(--text-glow); }
-.goal-row.is-done .goal-name { color: var(--text-2); }
-.goal-row.flash, .quest.flash { animation: row-flash 700ms var(--ease-out); }
+.is-done .goal-name { color: var(--text-2); background-size: 100% 2px; }
+.goal-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 10px; margin-top: 4px; font-size: 14px; color: var(--text-2); }
+.goal-kind { padding: 0 6px; border: 1px solid var(--line-dim); font-size: 12px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase; color: var(--blue); line-height: 1.5; }
+.goal-streak { display: inline-flex; align-items: center; gap: 4px; color: var(--streak); font-weight: 700; }
+.goal-streak .icon { width: 16px; height: 16px; filter: drop-shadow(0 0 4px rgba(255, 181, 71, .6)); }
+.goal-row.just-done .goal-box i { animation: bump var(--dur-slow) var(--ease-spring); }
 
-.box-check { display: grid; place-items: center; width: 44px; height: 44px; flex: none; }
-.box-check i {
+.goal-box i {
   display: grid;
   place-items: center;
-  width: 22px;
-  height: 22px;
+  width: 26px;
+  height: 26px;
   border: 2px solid var(--text);
-  transition: border-color var(--dur-fast), box-shadow var(--dur-fast), transform var(--dur-press);
+  transition: border-color var(--dur-fast), box-shadow var(--dur-fast), transform var(--dur-press) var(--ease-out);
 }
-.box-check .icon { width: 18px; height: 18px; stroke-width: 3; color: var(--blue); transform: scale(0); transition: transform var(--dur-base) var(--ease-spring); filter: drop-shadow(0 0 4px var(--blue)); }
-.box-check[aria-checked="true"] i { border-color: var(--blue); box-shadow: 0 0 10px rgba(76, 196, 255, .7); }
-.box-check[aria-checked="true"] .icon { transform: scale(1.15); }
-.box-check:active i { transform: scale(.86); }
-.box-check:disabled { opacity: .35; }
+.goal-box .icon { width: 18px; height: 18px; stroke-width: 3; color: var(--blue); transform: scale(0); transition: transform var(--dur-base) var(--ease-spring); filter: drop-shadow(0 0 4px var(--blue)); }
+.is-done .goal-box i { border-color: var(--blue); box-shadow: 0 0 12px rgba(76, 196, 255, .7), inset 0 0 8px rgba(76, 196, 255, .35); }
+.is-done .goal-box .icon { transform: scale(1.1); }
+.goal-toggle:active:not(:disabled) .goal-box i { transform: scale(.86); }
+.goal-toggle:disabled .goal-box { opacity: .4; }
+.goal-more { color: var(--text-3); }
+
+/* ---------- progress meter (one skewed segment per quest) ---------- */
+.quest-progress { display: grid; gap: 8px; }
+.qp-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
+.qp-count { font-size: 16px; color: var(--text-2); font-variant-numeric: tabular-nums; }
+.qp-count b { font-size: 22px; color: var(--text); }
+.quest-progress.is-complete .qp-count b { color: var(--blue); text-shadow: var(--text-glow); }
+.qp-track { display: flex; gap: 5px; height: 12px; padding: 0 4px; }
+.qp-track i {
+  flex: 1;
+  border: 1px solid var(--line-dim);
+  background: rgba(1, 4, 11, .6);
+  transform: skewX(-24deg);
+  transition: background-color var(--dur-base), border-color var(--dur-base), box-shadow var(--dur-base);
+}
+.qp-track i.on { background: var(--blue); border-color: var(--blue); box-shadow: 0 0 10px rgba(76, 196, 255, .8); }
+.qp-track i.lit { animation: seg-lit 650ms var(--ease-out); }
+.qp-track.is-bar { display: block; padding: 0; border: 1px solid var(--line-dim); }
+.qp-fill { display: block; height: 100%; background: var(--blue); box-shadow: 0 0 10px var(--blue); transform-origin: left; transform: scaleX(var(--p, 0)); transition: transform var(--dur-slow) var(--ease-out); }
+
+/* ---------- quest details window ---------- */
+.quest-title { text-align: center; font-size: 26px; font-weight: 700; line-height: 1.2; overflow-wrap: anywhere; text-shadow: var(--text-glow); }
+.quest-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; margin: 0; border: 1px solid var(--line-dim); background: var(--line-dim); }
+.quest-facts div { padding: 10px 12px; background: rgba(2, 9, 22, .95); }
+.quest-facts dt { font-size: 12px; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: var(--text-3); }
+.quest-facts dd { margin: 2px 0 0; font-size: 17px; font-weight: 600; }
+.quest-status { display: flex; justify-content: center; align-items: center; gap: 6px; font-size: 18px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: var(--text-2); }
+.quest-status .icon { width: 20px; height: 20px; stroke-width: 3; }
+.quest-status.is-done { color: var(--blue); text-shadow: var(--text-glow); }
+.quest-status.bump { animation: bump var(--dur-slow) var(--ease-spring); }
 
 .win-warn { text-align: center; font-size: 17px; color: var(--text); }
 .win-warn b { color: var(--red); font-weight: 700; letter-spacing: .06em; text-shadow: 0 0 8px rgba(255, 77, 94, .7); }
@@ -469,22 +535,7 @@ body.is-welcome .dock { display: none; }
   animation: shimmer 1.4s linear infinite;
 }
 
-/* compact quest rows (quest log day panel) */
-.quest-list, .day-quests { display: grid; gap: 12px; }
-.quest {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) auto 44px;
-  align-items: center;
-  gap: 4px 10px;
-  padding-right: 6px;
-  animation: rise var(--dur-slow) var(--ease-out) both;
-  animation-delay: calc(min(var(--i, 0), 10) * 55ms);
-}
-.quest::before { inset: -5px; }
-.quest-main { display: grid; gap: 0; min-height: 60px; padding: 10px 0 10px 14px; text-align: left; align-content: center; }
-.quest-main strong { font-size: 18px; font-weight: 700; overflow-wrap: anywhere; }
-.quest-main small { font-size: 14px; color: var(--text-2); }
-.quest.is-done { opacity: .78; }
+.quest-list { display: grid; gap: 12px; }
 
 /* ============================================================
    Dialog windows
@@ -747,6 +798,8 @@ dialog.win .daybox-head { padding-right: 40px; }
 @keyframes slide-in-right { from { opacity: 0; transform: translateX(28px); } }
 @keyframes slide-in-left { from { opacity: 0; transform: translateX(-28px); } }
 @keyframes breathe { 50% { opacity: .5; } }
+@keyframes sweep { to { transform: translateX(110%); } }
+@keyframes seg-lit { 0% { filter: brightness(3); transform: skewX(-24deg) scaleY(1.9); } 100% { filter: brightness(1); transform: skewX(-24deg) scaleY(1); } }
 @keyframes caret { 50% { opacity: 0; } }
 @keyframes flicker { 0% { opacity: 0; } 10% { opacity: 1; } 15% { opacity: .3; } 25% { opacity: 1; } 32% { opacity: .5; } 40%, 100% { opacity: 1; } }
 @keyframes dock-in { from { opacity: 0; transform: translate(-50%, 24px); } }

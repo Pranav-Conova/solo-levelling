@@ -1,9 +1,9 @@
 import { api, changed } from "../api.js";
 import { openAdd } from "../add.js";
-import { openQuest, openQuestInfo, toggleDone } from "../quest.js";
+import { goalRowHTML, openQuest, openQuestInfo, paintGoalRow, paintProgress, progressHTML, toggleDone } from "../quest.js";
 import {
   addDays, closeDialog, esc, fmt, heat, icon, iso, isValidISO, makeWindow, openDialog,
-  parseISO, plural, questKind, relativeDay, replayClass, statusText, toast, todayISO, withUndo, wireClose,
+  parseISO, plural, relativeDay, toast, todayISO, withUndo, wireClose,
 } from "../util.js";
 
 export const title = "Quest Log";
@@ -210,8 +210,9 @@ export function mount(el, arg) {
           <h3>${esc(relativeDay(d))}</h3>
           <p>${esc(fmt(d, { month: "long", day: "numeric", year: "numeric" }))} · <span data-day-count></span></p>
         </div>
+        ${progressHTML()}
         ${future ? `<p class="note">Planning ahead. These quests unlock when the day arrives.</p>` : ""}
-        <div class="day-quests" data-list></div>
+        <ul class="goal-list" data-list aria-label="Quests"></ul>
         <form class="quick-add" data-quick>
           <label class="sr-only" for="qa-${d}">Add a quest for ${esc(fmt(d, { month: "long", day: "numeric" }))}</label>
           <input class="input" id="qa-${d}" maxlength="80" autocomplete="off" placeholder="Add a quest for this day…" />
@@ -229,39 +230,30 @@ export function mount(el, arg) {
       const done = data.tasks.filter((t) => t.completed).length;
       const total = data.tasks.length;
       box.querySelector("[data-day-count]").textContent = total ? `${done}/${total} cleared` : "no quests";
+      paintProgress(box, data.tasks);
       summary[d] = { date: d, done, total };
       updateTile(d);
     };
 
-    const rowHTML = (t, i) => `
-      <article class="sys quest${t.completed ? " is-done" : ""}" style="--i:${i}" data-id="${t.id}">
-        <button class="quest-main" type="button" data-open aria-label="${esc(t.title)}, ${questKind(t)}. Open quest">
-          <strong>${esc(t.title)}</strong><small>${questKind(t)}</small>
-        </button>
-        <span class="status-text" aria-hidden="true">${statusText(t)}</span>
-        <button class="box-check" type="button" role="checkbox" aria-checked="${t.completed}" data-check
-                aria-label="${esc(t.title)} complete" ${future ? "disabled" : ""}><i>${icon("check")}</i></button>
-      </article>`;
-
+    // same quest row as the Quest Info window, so a quest looks the same everywhere
     const renderList = (quiet = false) => {
       list.innerHTML = data.tasks.length
-        ? data.tasks.map(rowHTML).join("")
-        : `<p class="empty-line">No quests recorded. Add one below.</p>`;
-      if (quiet) list.querySelectorAll(".quest").forEach((q) => q.classList.add("static"));
+        ? data.tasks.map((t, i) => goalRowHTML(t, i, { future })).join("")
+        : `<li class="empty-line">No quests recorded. Add one below.</li>`;
+      if (quiet) list.querySelectorAll(".goal-row").forEach((q) => q.classList.add("static"));
     };
     renderList();
     sync();
 
     list.addEventListener("click", async (e) => {
-      const card = e.target.closest(".quest[data-id]");
-      if (!card) return;
-      const t = data.tasks.find((x) => x.id === Number(card.dataset.id));
+      const row = e.target.closest(".goal-row[data-id]");
+      if (!row) return;
+      const t = data.tasks.find((x) => x.id === Number(row.dataset.id));
       if (e.target.closest("[data-check]")) {
-        const saving = toggleDone(t, d, { source: "calendar", el: card });
-        renderList(true);
-        if (t.completed) replayClass(list.querySelector(`[data-id="${t.id}"]`), "flash");
+        const saving = toggleDone(t, d, { source: "calendar", el: row });
+        paintGoalRow(row, t);
         sync();
-        if (!(await saving)) { renderList(true); sync(); }
+        if (!(await saving)) { paintGoalRow(row, t); sync(); }
       } else if (e.target.closest("[data-open]")) {
         openQuest(t, d, {
           source: "calendar",

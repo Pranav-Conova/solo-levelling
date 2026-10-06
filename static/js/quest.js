@@ -1,8 +1,8 @@
 import { api, changed } from "./api.js";
 import { openAdd } from "./add.js";
 import {
-  closeDialog, esc, fmt, haptic, icon, makeWindow, openDialog, particles,
-  questKind, replayClass, statusText, todayISO, toast, winHead, wireClose,
+  closeDialog, esc, fmt, haptic, icon, makeWindow, openDialog, particles, plural,
+  questKind, replayClass, todayISO, toast, winHead, wireClose,
 } from "./util.js";
 
 /**
@@ -25,23 +25,72 @@ export async function toggleDone(task, date, { source, el } = {}) {
   }
 }
 
-export const checkHTML = (t, disabled) => `
-  <button class="box-check" type="button" role="checkbox" aria-checked="${t.completed}" data-check="${t.id}"
-          aria-label="${esc(t.title)} complete" ${disabled ? "disabled" : ""}><i>${icon("check")}</i></button>`;
+// ---------- quest row: the whole row ticks the quest; ⋮ opens its details ----------
+// `info` is the Daily Quest's habit record ({ streak, ... }) when known
+function metaHTML(t, info) {
+  // done state is shown by the filled box, the strike line and dimming: no extra text, so rows never change height
+  if (!t.is_permanent) return `<span class="goal-kind">Personal</span><span>one day only</span>`;
+  // without habit data (e.g. a past day in the Quest Log) don't guess at the streak
+  if (!info) return `<span class="goal-kind">Daily</span><span>every day</span>`;
+  return `<span class="goal-kind">Daily</span>${info.streak
+    ? `<span class="goal-streak">${icon("flame")}${info.streak}-day streak</span>`
+    : `<span>start a streak today</span>`}`;
+}
 
-export const goalRowHTML = (t, i, { future = false } = {}) => `
+export const goalRowHTML = (t, i, { future = false, info } = {}) => `
   <li class="goal-row${t.completed ? " is-done" : ""}" data-id="${t.id}" style="--i:${i}">
-    <button class="goal-name" type="button" data-open="${t.id}" aria-label="${esc(t.title)}, ${questKind(t)}. Open quest">${esc(t.title)}</button>
-    <span class="status-text" aria-hidden="true">${statusText(t)}</span>
-    ${checkHTML(t, future)}
+    <button class="goal-toggle" type="button" role="checkbox" aria-checked="${t.completed}" data-check="${t.id}"
+            aria-label="${esc(t.title)}" aria-describedby="goal-meta-${t.id}" ${future ? "disabled" : ""}>
+      <span class="goal-text">
+        <span class="goal-name">${esc(t.title)}</span>
+        <span class="goal-meta" id="goal-meta-${t.id}">${metaHTML(t, info)}</span>
+      </span>
+      <span class="goal-box" aria-hidden="true"><i>${icon("check")}</i></span>
+    </button>
+    <button class="icon-btn goal-more" type="button" data-open="${t.id}" aria-label="Details for ${esc(t.title)}">${icon("more-v")}</button>
   </li>`;
 
-export function paintGoalRow(row, t) {
+export function paintGoalRow(row, t, info) {
+  const wasDone = row.classList.contains("is-done");
   row.classList.toggle("is-done", t.completed);
-  const status = row.querySelector(".status-text");
-  status.textContent = statusText(t);
-  replayClass(status, "bump");
   row.querySelector("[data-check]").setAttribute("aria-checked", t.completed);
+  row.querySelector(".goal-meta").innerHTML = metaHTML(t, info);
+  if (t.completed && !wasDone) replayClass(row, "just-done");
+}
+
+// ---------- progress meter: one segment per quest, like a HUD gauge ----------
+export const progressHTML = () => `
+  <div class="quest-progress" role="progressbar" aria-label="Quests cleared" aria-valuemin="0" data-progress>
+    <div class="qp-head"><span class="caps">Progress</span><span class="qp-count" data-count></span></div>
+    <div class="qp-track" data-track></div>
+  </div>`;
+
+export function paintProgress(root, tasks) {
+  const el = root.querySelector("[data-progress]");
+  if (!el) return;
+  el.hidden = !tasks.length;
+  const done = tasks.filter((t) => t.completed).length;
+  el.setAttribute("aria-valuemax", tasks.length);
+  el.setAttribute("aria-valuenow", done);
+  el.setAttribute("aria-valuetext", `${done} of ${tasks.length} cleared`);
+  el.querySelector("[data-count]").innerHTML = `<b>${done}</b> / ${tasks.length} cleared`;
+  el.classList.toggle("is-complete", tasks.length > 0 && done === tasks.length);
+
+  const track = el.querySelector("[data-track]");
+  const segmented = tasks.length <= 12; // past that, segments get too thin to read
+  track.classList.toggle("is-bar", !segmented);
+  if (!segmented) {
+    track.innerHTML = `<i class="qp-fill" style="--p:${done / tasks.length}"></i>`;
+    return;
+  }
+  // keep existing segments so newly lit ones can animate
+  while (track.children.length < tasks.length) track.appendChild(document.createElement("i"));
+  while (track.children.length > tasks.length) track.lastChild.remove();
+  [...track.children].forEach((seg, i) => {
+    const on = i < done;
+    if (on && !seg.classList.contains("on")) replayClass(seg, "lit");
+    seg.classList.toggle("on", on);
+  });
 }
 
 // ---------- Quest info for any day (the Quest Log opens this) ----------
@@ -56,6 +105,7 @@ export function openQuestInfo(tasks, date, { source, onClose } = {}) {
       ${winHead("Quest Info")}
       ${tasks.length ? `
         <p class="win-lead">[Daily Quest ${isToday ? "has arrived" : `of ${esc(fmt(date, { month: "long", day: "numeric" }))}`}.]</p>
+        ${progressHTML()}
         <h3 class="goal-title">Goal</h3>
         <ul class="goal-list">${tasks.map((t, i) => goalRowHTML(t, i, { future })).join("")}</ul>
         <p class="win-warn">${future
@@ -66,6 +116,7 @@ export function openQuestInfo(tasks, date, { source, onClose } = {}) {
         <button class="btn btn-primary btn-block" type="button" data-new>Create a quest</button>`}
     </div>`;
   wireClose(dlg);
+  paintProgress(dlg, tasks);
   dlg.querySelector("[data-new]")?.addEventListener("click", () => { closeDialog(dlg); openAdd({ date }); });
 
   dlg.addEventListener("click", async (e) => {
@@ -75,30 +126,42 @@ export function openQuestInfo(tasks, date, { source, onClose } = {}) {
     const row = btn.closest(".goal-row");
     const saving = toggleDone(t, date, { source, el: row });
     paintGoalRow(row, t);
-    if (!(await saving) && dlg.open) paintGoalRow(row, t);
+    paintProgress(dlg, tasks);
+    if (!(await saving) && dlg.open) { paintGoalRow(row, t); paintProgress(dlg, tasks); }
   });
 
   openDialog(dlg);
   return dlg;
 }
 
-// ---------- Single quest ----------
-export function openQuest(task, date, { source, onRemove, onClose, onToggle } = {}) {
+// ---------- Single quest details ----------
+export function openQuest(task, date, { source, onRemove, onClose, onToggle, info } = {}) {
   const future = date > todayISO();
   const dlg = makeWindow(task.title);
   dlg.addEventListener("close", () => onClose?.());
 
+  const facts = [
+    ["Type", questKind(task)],
+    task.is_permanent
+      ? ["Since", fmt(task.start_date, { month: "short", day: "numeric", year: "numeric" })]
+      : ["Day", fmt(date, { weekday: "short", month: "short", day: "numeric" })],
+    ...(info ? [["Streak", plural(info.streak, "day")], ["Cleared", plural(info.total_done, "day")]] : []),
+  ];
+
   dlg.innerHTML = `
     <div class="win-body sys">
       ${winHead("Quest")}
-      <p class="win-lead">[${esc(questKind(task))}: <strong>${esc(task.title)}</strong>]</p>
-      <p class="goal-title" style="font-size:24px;text-decoration:none" data-status></p>
+      <p class="quest-title">${esc(task.title)}</p>
+      <dl class="quest-facts">
+        ${facts.map(([k, v]) => `<div><dt>${k}</dt><dd>${esc(v)}</dd></div>`).join("")}
+      </dl>
+      <p class="quest-status" data-status></p>
       ${future ? `<p class="note">This quest unlocks on its day. You can plan it now.</p>` : ""}
       <div class="win-actions">
         <button class="btn btn-primary btn-block" type="button" data-toggle ${future ? "disabled" : ""}></button>
       </div>
       <div class="win-foot">
-        <button class="btn btn-text btn-danger" type="button" data-remove>${task.is_permanent ? "Abandon daily quest" : "Delete quest"}</button>
+        <button class="btn btn-text btn-danger" type="button" data-remove>${icon("trash", "icon-sm")} ${task.is_permanent ? "Abandon daily quest" : "Delete quest"}</button>
       </div>
     </div>`;
   wireClose(dlg);
@@ -106,9 +169,10 @@ export function openQuest(task, date, { source, onRemove, onClose, onToggle } = 
   const statusEl = dlg.querySelector("[data-status]");
   const toggleBtn = dlg.querySelector("[data-toggle]");
   const render = () => {
-    statusEl.textContent = statusText(task);
-    statusEl.style.color = task.completed ? "var(--blue)" : "var(--text-2)";
-    toggleBtn.innerHTML = task.completed ? `${icon("check")} Completed, tap to undo` : "Complete quest";
+    statusEl.innerHTML = task.completed ? `${icon("check")} Cleared${date === todayISO() ? " today" : ""}` : "Not cleared yet";
+    statusEl.classList.toggle("is-done", task.completed);
+    toggleBtn.innerHTML = task.completed ? "Mark as not cleared" : `${icon("check")} Clear quest`;
+    toggleBtn.className = `btn btn-block ${task.completed ? "btn-sys" : "btn-primary"}`;
   };
 
   toggleBtn.addEventListener("click", async () => {
