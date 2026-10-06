@@ -1,0 +1,174 @@
+:root {
+  color-scheme: light dark;
+  --bg: #0f1115;
+  --panel: #171a21;
+  --border: #2a2e38;
+  --text: #e8e9ec;
+  --muted: #9aa0ab;
+  --accent: #5b8def;
+  --done: #3ecf8e;
+  --partial: #e8b84b;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg: #f5f6f8;
+    --panel: #ffffff;
+    --border: #e1e3e8;
+    --text: #1c1e22;
+    --muted: #5c6370;
+    --accent: #2f6fed;
+    --done: #1f9d66;
+    --partial: #c98a12;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.app { max-width: 960px; margin: 0 auto; padding: 24px 16px 60px; }
+
+header h1 { font-size: 1.4rem; margin-bottom: 20px; }
+
+.layout {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 720px) {
+  .layout { grid-template-columns: 1fr; }
+}
+
+.calendar-panel, .day-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 16px;
+}
+
+.calendar-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+
+.calendar-header button {
+  background: none;
+  border: 1px solid var(--border);
+  color: var(--text);
+  border-radius: 6px;
+  padding: 4px 10px;
+  cursor: pointer;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 6px;
+}
+
+.day-cell {
+  aspect-ratio: 1;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  font-size: 0.85rem;
+  position: relative;
+}
+
+.day-cell:hover { border-color: var(--accent); }
+
+.day-cell.empty { visibility: hidden; cursor: default; }
+
+.day-cell.selected { outline: 2px solid var(--accent); }
+
+.day-cell.today { font-weight: 700; }
+
+.day-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  margin-top: 4px;
+}
+
+.day-dot.done-all { background: var(--done); }
+.day-dot.done-partial { background: var(--partial); }
+.day-dot.done-none { background: transparent; }
+
+#addTaskForm {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+#addTaskForm input[type="text"] {
+  padding: 8px 10px;
+  border-radius: 6px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+.permanent-toggle {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.85rem;
+  color: var(--muted);
+}
+
+#addTaskForm button {
+  padding: 8px;
+  border-radius: 6px;
+  border: none;
+  background: var(--accent);
+  color: white;
+  cursor: pointer;
+}
+
+#taskList { list-style: none; padding: 0; margin: 0; }
+
+#taskList li {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+#taskList li:last-child { border-bottom: none; }
+
+#taskList .title { flex: 1; }
+
+#taskList .title.completed { text-decoration: line-through; color: var(--muted); }
+
+#taskList .badge {
+  font-size: 0.7rem;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--border);
+  color: var(--muted);
+}
+
+#taskList .delete-btn {
+  background: none;
+  border: none;
+  color: var(--muted);
+  cursor: pointer;
+  font-size: 0.9rem;
+}
+
+#taskList .delete-btn:hover { color: #e05d5d; }

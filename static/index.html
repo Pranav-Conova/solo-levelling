@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Self Improvement Tracker</title>
+  <link rel="stylesheet" href="/static/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <h1>Self Improvement Tracker</h1>
+    </header>
+
+    <div class="layout">
+      <section class="calendar-panel">
+        <div class="calendar-header">
+          <button id="prevMonth">&laquo;</button>
+          <h2 id="monthLabel"></h2>
+          <button id="nextMonth">&raquo;</button>
+        </div>
+        <div class="calendar-grid" id="calendarGrid"></div>
+      </section>
+
+      <section class="day-panel">
+        <h2 id="dayLabel">Today</h2>
+
+        <form id="addTaskForm">
+          <input type="text" id="taskTitle" placeholder="New task..." required />
+          <label class="permanent-toggle">
+            <input type="checkbox" id="taskPermanent" />
+            Permanent (repeats every day)
+          </label>
+          <button type="submit">Add</button>
+        </form>
+
+        <ul id="taskList"></ul>
+      </section>
+    </div>
+  </div>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>
