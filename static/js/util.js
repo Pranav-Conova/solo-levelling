@@ -42,42 +42,19 @@ export const esc = (v) =>
 
 export const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
 
-export const initial = (title) => (title.trim().match(/[\p{L}\p{N}]/u) || ["•"])[0];
+export const initial = (title) => (title.trim().match(/[\p{L}\p{N}]/u) || ["?"])[0];
 
 export const icon = (name, cls = "") =>
   `<svg class="icon ${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
 
-// a stable gradient per task so each "post" has its own look, all from the palette
-const MEDIA = [
-  "linear-gradient(135deg, #FB6A2C, #FD3DB5)",
-  "linear-gradient(135deg, #FD3DB5, #8C1946)",
-  "linear-gradient(135deg, #8C1946, #FB6A2C)",
-  "linear-gradient(45deg, #FB6A2C 0%, #FD3DB5 55%, #8C1946 100%)",
-  "linear-gradient(160deg, #FD3DB5, #FB6A2C 70%)",
-];
-export const mediaFor = (id) => MEDIA[id % MEDIA.length];
+export const statusText = (t) => (t.completed ? "[Complete]" : "[Incomplete]");
+export const questKind = (t) => (t.is_permanent ? "Daily Quest" : "Personal Added");
 
 // heat level 0-3 for a day's completion ratio
 export function heat(done, total) {
   if (!total || !done) return 0;
   if (done === total) return 3;
   return done / total >= 0.5 ? 2 : 1;
-}
-
-// progress ring; call setRing() after insert so the stroke animates from empty
-const RING_R = 30;
-const RING_C = 2 * Math.PI * RING_R;
-export const ring = () => `
-  <svg class="ring" viewBox="0 0 76 76" aria-hidden="true">
-    <circle class="ring-track" cx="38" cy="38" r="${RING_R}"/>
-    <circle class="ring-value" cx="38" cy="38" r="${RING_R}" stroke-dasharray="${RING_C}" stroke-dashoffset="${RING_C}"/>
-  </svg>`;
-export function setRing(svg, done, total) {
-  const value = svg?.querySelector(".ring-value");
-  if (!value) return;
-  const p = total ? done / total : 0;
-  value.style.opacity = p ? 1 : 0; // a round cap would otherwise leave a dot at 0%
-  requestAnimationFrame(() => requestAnimationFrame(() => { value.style.strokeDashoffset = RING_C * (1 - p); }));
 }
 
 // ---------- motion ----------
@@ -105,106 +82,138 @@ export function countUp(el, to, ms = 700) {
   requestAnimationFrame(step);
 }
 
-const BURST_COLORS = ["#FD3DB5", "#FB6A2C", "#8C1946", "#FFB8DC"];
-
-// small particle ring around an element (used on the like button)
-export function burst(host, count = 8) {
-  if (reducedMotion()) return;
+// glowing motes drifting up from an element, like mana leaving a cleared quest
+export function particles(fromEl, count = 14) {
+  if (reducedMotion() || !fromEl) return;
+  const r = fromEl.getBoundingClientRect();
   for (let i = 0; i < count; i++) {
-    const dot = document.createElement("i");
-    dot.className = "burst-dot";
-    dot.style.background = BURST_COLORS[i % BURST_COLORS.length];
-    host.appendChild(dot);
-    const angle = (i / count) * Math.PI * 2;
-    const dist = 22 + Math.random() * 6;
-    dot.animate(
+    const p = document.createElement("i");
+    p.className = "particle";
+    p.style.left = `${r.left + Math.random() * r.width}px`;
+    p.style.top = `${r.top + r.height * (0.4 + Math.random() * 0.6)}px`;
+    document.body.appendChild(p);
+    const dx = (Math.random() - 0.5) * 40;
+    const dy = -40 - Math.random() * 90;
+    p.animate(
       [
-        { transform: "translate(0,0) scale(1)", opacity: 1 },
-        { transform: `translate(${Math.cos(angle) * dist}px, ${Math.sin(angle) * dist}px) scale(0)`, opacity: 0 },
+        { transform: "translate(0,0) scale(1)", opacity: 0 },
+        { opacity: 1, offset: 0.2 },
+        { transform: `translate(${dx}px, ${dy}px) scale(.3)`, opacity: 0 },
       ],
-      { duration: 520, easing: "cubic-bezier(.2,.8,.2,1)" },
-    ).onfinish = () => dot.remove();
+      { duration: 700 + Math.random() * 600, easing: "cubic-bezier(.2,.8,.2,1)", delay: Math.random() * 120 },
+    ).onfinish = () => p.remove();
   }
 }
 
-export function confetti(host, count = 36) {
-  if (reducedMotion()) return;
-  for (let i = 0; i < count; i++) {
-    const piece = document.createElement("i");
-    piece.className = "confetti";
-    piece.style.background = BURST_COLORS[i % BURST_COLORS.length];
-    host.appendChild(piece);
-    const x = (Math.random() - 0.5) * 520;
-    const y = -120 - Math.random() * 260;
-    piece.animate(
-      [
-        { transform: "translate(-50%, 0) rotate(0deg)", opacity: 1 },
-        { transform: `translate(calc(-50% + ${x * 0.6}px), ${y}px) rotate(${Math.random() * 360}deg)`, opacity: 1, offset: 0.45 },
-        { transform: `translate(calc(-50% + ${x}px), ${y + 420}px) rotate(${Math.random() * 720}deg)`, opacity: 0 },
-      ],
-      { duration: 1500 + Math.random() * 700, easing: "cubic-bezier(.2,.7,.4,1)" },
-    ).onfinish = () => piece.remove();
-  }
+// the System's notification "ding" (synthesised, so there is no audio file to ship)
+let audio;
+export const soundOn = () => pref("sound", "on") !== "off";
+export function ding(kind = "notice") {
+  if (!soundOn()) return;
+  try {
+    audio ??= new (window.AudioContext || window.webkitAudioContext)();
+    if (audio.state === "suspended") audio.resume(); // browsers start audio muted until a tap
+    const now = audio.currentTime;
+    const notes = kind === "penalty" ? [220, 207.65] : kind === "level" ? [1046.5, 1318.5, 1568] : [1318.5, 1975.5];
+    notes.forEach((freq, i) => {
+      const osc = audio.createOscillator();
+      const gain = audio.createGain();
+      osc.type = kind === "penalty" ? "sawtooth" : "sine";
+      osc.frequency.value = freq;
+      const t = now + i * 0.07;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(kind === "penalty" ? 0.05 : 0.08, t + 0.01);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 0.6);
+      osc.connect(gain).connect(audio.destination);
+      osc.start(t);
+      osc.stop(t + 0.65);
+    });
+  } catch (e) { /* audio unavailable */ }
 }
 
-// ---------- dialogs (native <dialog> for focus trapping + Esc, animated close) ----------
-export function openDialog(dlg) {
+// System text appears character by character; screen readers get the whole line at once
+export function typewrite(el, text, speed = 28) {
+  el.setAttribute("aria-label", text);
+  if (reducedMotion()) { el.textContent = text; el.classList.add("typed", "is-done"); return Promise.resolve(); }
+  el.textContent = "";
+  el.classList.add("typed");
+  el.classList.remove("is-done");
+  return new Promise((resolve) => {
+    let i = 0;
+    const tick = () => {
+      if (!el.isConnected) return resolve();
+      el.textContent = text.slice(0, ++i);
+      if (i < text.length) setTimeout(tick, speed);
+      else { el.classList.add("is-done"); resolve(); }
+    };
+    tick();
+  });
+}
+
+// ---------- system windows (native <dialog> for focus trapping + Esc, animated close) ----------
+export function openDialog(dlg, sound = "notice") {
   dlg.classList.remove("is-closing");
-  if (!dlg.open) dlg.showModal();
+  if (!dlg.open) { dlg.showModal(); if (sound) ding(sound); }
 }
 
 export function closeDialog(dlg) {
   if (!dlg.open || dlg.classList.contains("is-closing")) return;
   if (reducedMotion()) { dlg.close(); return; }
   dlg.classList.add("is-closing");
-  dlg.addEventListener("animationend", () => {
+  setTimeout(() => {
     dlg.classList.remove("is-closing");
     dlg.close();
-  }, { once: true });
+  }, 230);
 }
 
-// Esc and backdrop clicks close with the animation instead of instantly
-export function wireDialog(dlg) {
+export function makeWindow(label, { persistent = false } = {}) {
+  const dlg = document.createElement("dialog");
+  dlg.className = "win";
+  dlg.setAttribute("aria-label", label);
+  document.body.appendChild(dlg);
   dlg.addEventListener("cancel", (e) => { e.preventDefault(); closeDialog(dlg); });
   dlg.addEventListener("click", (e) => { if (e.target === dlg) closeDialog(dlg); });
+  if (!persistent) dlg.addEventListener("close", () => dlg.remove());
   return dlg;
 }
 
-export function makeDialog(className) {
-  const dlg = document.createElement("dialog");
-  dlg.className = className;
-  document.body.appendChild(dlg);
-  return wireDialog(dlg);
+export const winHead = (title, iconName = "alert") => `
+  <button class="icon-btn win-close" type="button" data-close aria-label="Close">${icon("x")}</button>
+  <div class="win-head">
+    <span class="box icon-box" aria-hidden="true">${icon(iconName)}</span>
+    <h2 class="box">${esc(title)}</h2>
+  </div>`;
+
+export function wireClose(dlg) {
+  dlg.querySelectorAll("[data-close]").forEach((b) => b.addEventListener("click", () => closeDialog(dlg)));
 }
 
-// Instagram-style action sheet: [{ label, danger?, run }]
-export function actionSheet(title, actions) {
-  const dlg = makeDialog("sheet");
-  dlg.setAttribute("aria-label", title);
+// a small confirm-style menu: [{ label, danger?, run }]
+export function actionMenu(title, actions) {
+  const dlg = makeWindow(title);
   dlg.innerHTML = `
-    <div class="sheet-body flush">
-      <div class="grabber" aria-hidden="true"></div>
-      <p class="menu-title">${esc(title)}</p>
+    <div class="win-body sys">
+      ${winHead(title, "list")}
       <div class="menu-list">
-        ${actions.map((a, i) => `<button type="button" data-i="${i}" class="${a.danger ? "danger" : ""}">${esc(a.label)}</button>`).join("")}
-        <button type="button" data-cancel>Cancel</button>
+        ${actions.map((a, i) => `<button class="btn btn-sys btn-block${a.danger ? " btn-danger" : ""}" type="button" data-i="${i}">${esc(a.label)}</button>`).join("")}
+        <button class="btn btn-text" type="button" data-close>Cancel</button>
       </div>
     </div>`;
-  dlg.addEventListener("close", () => dlg.remove());
+  wireClose(dlg);
   dlg.querySelectorAll("[data-i]").forEach((b) =>
     b.addEventListener("click", () => { closeDialog(dlg); actions[Number(b.dataset.i)].run(); }),
   );
-  dlg.querySelector("[data-cancel]").addEventListener("click", () => closeDialog(dlg));
   openDialog(dlg);
 }
 
-// ---------- toasts ----------
+// ---------- toasts (system notifications) ----------
 const pending = new Set();
 
-export function toast(message, { action, onAction, onTimeout, duration = 4000, tone } = {}) {
+export function toast(message, { action, onAction, onTimeout, duration = 3800, tone } = {}) {
   const region = document.querySelector(".toasts");
   const el = document.createElement("div");
-  el.className = `toast${tone ? ` ${tone}` : ""}`;
+  el.className = `toast sys${tone ? " penalty" : ""}`;
+  ding(tone ? "penalty" : "notice");
   el.innerHTML = `<p>${esc(message)}</p>${action ? `<button type="button">${esc(action)}</button>` : ""}`;
   region.appendChild(el);
 
@@ -214,8 +223,7 @@ export function toast(message, { action, onAction, onTimeout, duration = 4000, t
     closed = true;
     clearTimeout(timer);
     el.classList.add("is-leaving");
-    el.addEventListener("animationend", () => el.remove(), { once: true });
-    setTimeout(() => el.remove(), 400);
+    setTimeout(() => el.remove(), 220);
   };
   const timer = setTimeout(() => { onTimeout?.(); dismiss(); }, duration);
   el.querySelector("button")?.addEventListener("click", () => { onAction?.(); dismiss(); });

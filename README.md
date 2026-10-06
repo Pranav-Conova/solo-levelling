@@ -1,22 +1,27 @@
 # Solo Levelling
 
-A self-improvement tracker with an Instagram-style UI. Two kinds of tasks:
+A self-improvement tracker styled after the System from the *Solo Leveling* anime: glowing blue System windows that hand you a Daily Quest, warn you about penalties and level you up.
 
-- **Daily habits**: added once, show up every day from then on (e.g. "Read 20 pages"). Stopping one keeps its past history.
-- **One-off tasks**: only show up on the day you add them for.
+Quests are plain text, so they can be anything: "Study for 1 hour", "Read 20 pages", "Call mom". Each quest is either:
 
-## Pages
+- **Daily Quest**: arrives every day from the day you create it. Abandoning it keeps its past record.
+- **Personal quest**: belongs to a single day.
 
-- **Home**: today's tasks as a feed. Habits appear as "stories" at the top (gradient ring = not done yet). Double-tap a card or tap the heart to complete it.
-- **Story viewer**: tap a habit to step through your habits full-screen. Tap right/left to move, hold to pause, swipe down to close. Arrow keys work on desktop.
-- **Calendar**: a monthly heatmap of what you got done. Click a day to see, check off or add tasks for it. Swipe or use the arrow keys to change months.
-- **Profile**: level, rank (E to S), XP, streaks, a grid of the last 30 days, and your habit list (where you can stop a habit).
+## Screens
 
-You earn 10 XP per completed task and +20 XP for a perfect day. Your streak counts consecutive days with at least one task done.
+- **Awakening** (first visit): *"You have acquired the qualifications to be a Player. Will you accept?"* Decline at your own risk. You then enter your name and the Daily Quest arrives.
+- **Quest Info** (home): `[Daily Quest has arrived.]`, the GOAL list with `[Complete]`/`[Incomplete]` and checkboxes, the penalty warning, and a countdown to the daily reset at local midnight.
+- **Quest Complete**: a rewards window when you clear every quest for the day.
+- **Penalty**: a red window the next morning if you left quests unfinished yesterday.
+- **Level Up**: a notification when your EXP crosses into a new level.
+- **Quest Log** (calendar): a monthly record. Tap a day to see, check off or add quests for it.
+- **Status** (profile): Name, Job, Title (rank E to S), Level, HP/MP bars and STR/AGI/VIT/INT/PER. Every stat comes from your real record, and the screen labels which number drives each one. You can also turn the System sound off here.
 
-The layout is responsive. Phones get a bottom tab bar and sheets, tablets get an icon rail, and desktops get a full sidebar plus a progress rail. Light and dark themes follow your system setting, and you can switch them by hand. Animations are skipped when the OS "reduce motion" setting is on.
+Quests give 10 EXP each, plus a 20 EXP bonus for a perfect day. Your streak counts consecutive days with at least one quest cleared.
 
-Colors come from Figma's "Space berries" palette (`#FD3DB5 #FFB8DC #FB6A2C #8C1946`).
+The layout works on phones and desktops. System windows unfold from a line, text types itself out, and a soft "ding" plays (synthesised in the browser, with a mute toggle). All animation is skipped when the OS "reduce motion" setting is on.
+
+All colours are CSS variables in one block at the top of `static/style.css`.
 
 ## Run locally
 
@@ -40,11 +45,11 @@ By default it uses a local SQLite file (`tracker.db`). Set `DATABASE_URL` to a P
 
 ## API
 
-- `POST /api/tasks`: create a task `{title, is_permanent, specific_date?, start_date?}`
-- `GET /api/days/{date}`: tasks and completion status for a date
+- `POST /api/tasks`: create a quest `{title, is_permanent, specific_date?, start_date?}`
+- `GET /api/days/{date}`: quests and completion for a date
 - `POST /api/days/{date}/tasks/{task_id}/completion`: `{completed: true/false}`
-- `DELETE /api/tasks/{task_id}`: delete a task and its history
-- `POST /api/tasks/{task_id}/archive?on=YYYY-MM-DD`: stop a daily habit from that day on (history is kept)
-- `GET /api/calendar?start=YYYY-MM-DD&end=YYYY-MM-DD`: per-day done/total counts
-- `GET /api/habits?today=YYYY-MM-DD`: active habits with streaks
-- `GET /api/stats?today=YYYY-MM-DD`: XP, level, rank and streaks
+- `DELETE /api/tasks/{task_id}`: delete a quest and its history
+- `POST /api/tasks/{task_id}/archive?on=YYYY-MM-DD`: stop a Daily Quest from that day on (history is kept)
+- `GET /api/calendar?start=YYYY-MM-DD&end=YYYY-MM-DD`: per-day cleared/total counts
+- `GET /api/habits?today=YYYY-MM-DD`: active Daily Quests with streaks
+- `GET /api/stats?today=YYYY-MM-DD`: EXP, level, rank and streaks

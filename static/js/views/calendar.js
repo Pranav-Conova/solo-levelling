@@ -1,11 +1,12 @@
 import { api, changed } from "../api.js";
 import { openAdd } from "../add.js";
+import { openQuest, openQuestInfo, toggleDone } from "../quest.js";
 import {
-  closeDialog, esc, fmt, heat, icon, iso, isValidISO, makeDialog, openDialog, parseISO, plural,
-  reducedMotion, relativeDay, ring, setRing, toast, todayISO, withUndo, addDays,
+  addDays, closeDialog, esc, fmt, heat, icon, iso, isValidISO, makeWindow, openDialog,
+  parseISO, plural, questKind, relativeDay, replayClass, statusText, toast, todayISO, withUndo, wireClose,
 } from "../util.js";
 
-export const title = "Calendar";
+export const title = "Quest Log";
 
 const WEEKDAYS = Array.from({ length: 7 }, (_, i) =>
   new Date(2023, 0, 1 + i).toLocaleDateString(undefined, { weekday: "narrow" }), // 2023-01-01 was a Sunday
@@ -23,37 +24,38 @@ export function mount(el, arg) {
   const desktop = matchMedia("(min-width: 1024px)");
 
   el.innerHTML = `
-    <div class="cal-page">
-      <section aria-labelledby="cal-title">
-        <div class="cal-head">
-          <h1 id="cal-title" aria-live="polite"></h1>
-          <button class="icon-btn" type="button" data-prev aria-label="Previous month">${icon("chevron-left")}</button>
-          <button class="btn btn-secondary" type="button" data-today style="min-height:36px;padding:0 14px">Today</button>
-          <button class="icon-btn" type="button" data-next aria-label="Next month">${icon("chevron-right")}</button>
-        </div>
-        <p class="cal-sub">Tap a day to see and update its tasks. Swipe to change month.</p>
-        <div class="cal-weekdays" aria-hidden="true">${WEEKDAYS.map((d) => `<span>${esc(d)}</span>`).join("")}</div>
-        <div class="cal-grid" role="group" aria-labelledby="cal-title" data-grid></div>
-        <div class="legend" aria-hidden="true">Less <i></i><i class="h1"></i><i class="h2"></i><i class="h3"></i> More</div>
-        <div class="month-stats" data-mstats></div>
-      </section>
-      <aside class="day-panel" aria-label="Selected day" data-panel></aside>
+    <div class="page">
+      <div class="page-title"><div class="win-head">
+        <span class="box icon-box" aria-hidden="true">${icon("calendar")}</span><h1 class="box">Quest Log</h1>
+      </div></div>
+      <div class="cal-page">
+        <section class="sys cal-section" aria-labelledby="cal-month">
+          <div class="cal-head">
+            <h2 id="cal-month" aria-live="polite"></h2>
+            <button class="icon-btn" type="button" data-prev aria-label="Previous month">${icon("chevron-left")}</button>
+            <button class="btn btn-sys btn-sm" type="button" data-today>Today</button>
+            <button class="icon-btn" type="button" data-next aria-label="Next month">${icon("chevron-right")}</button>
+          </div>
+          <div class="cal-weekdays caps" aria-hidden="true">${WEEKDAYS.map((d) => `<span>${esc(d)}</span>`).join("")}</div>
+          <div class="cal-grid" role="group" aria-labelledby="cal-month" data-grid></div>
+          <div class="legend" aria-hidden="true">Less <i></i><i class="h1"></i><i class="h2"></i><i class="h3"></i> More</div>
+          <div class="month-stats" data-mstats></div>
+        </section>
+        <aside class="sys day-panel" aria-label="Selected day" data-panel></aside>
+      </div>
     </div>`;
 
   const grid = el.querySelector("[data-grid]");
   const panel = el.querySelector("[data-panel]");
 
-  // mobile: the selected day opens in a bottom sheet
-  const sheet = makeDialog("sheet");
-  sheet.setAttribute("aria-label", "Day details");
-  sheet.innerHTML = `
-    <div class="sheet-body" style="padding-left:0;padding-right:0">
-      <div class="grabber" aria-hidden="true"></div>
-      <button class="icon-btn sheet-close" type="button" data-close aria-label="Close">${icon("x")}</button>
-      <div data-sheet-box></div>
+  // phones: the selected day opens in a System window
+  const win = makeWindow("Day record", { persistent: true });
+  win.innerHTML = `<div class="win-body sys" style="padding:0">
+      <button class="icon-btn win-close" type="button" data-close aria-label="Close">${icon("x")}</button>
+      <div data-win-box></div>
     </div>`;
-  const sheetBox = sheet.querySelector("[data-sheet-box]");
-  sheet.querySelector("[data-close]").addEventListener("click", () => closeDialog(sheet));
+  wireClose(win);
+  const winBox = win.querySelector("[data-win-box]");
 
   // ---------- month grid ----------
   const monthStart = () => iso(new Date(year, month, 1));
@@ -61,8 +63,8 @@ export function mount(el, arg) {
 
   function tileLabel(d, s) {
     const name = fmt(d, { weekday: "long", month: "long", day: "numeric" });
-    if (!s || !s.total) return `${name}: no tasks`;
-    return `${name}: ${s.done} of ${plural(s.total, "task")} done`;
+    if (!s || !s.total) return `${name}: no quests`;
+    return `${name}: ${s.done} of ${plural(s.total, "quest")} cleared`;
   }
 
   function tileHTML(d, i) {
@@ -92,7 +94,7 @@ export function mount(el, arg) {
     if (quiet) grid.querySelectorAll(".tile").forEach((t) => t.classList.add("static"));
     grid.classList.remove("slide-next", "slide-prev");
     if (direction) { void grid.offsetWidth; grid.classList.add(direction > 0 ? "slide-next" : "slide-prev"); }
-    el.querySelector("#cal-title").textContent = first.toLocaleDateString(undefined, { month: "long", year: "numeric" });
+    el.querySelector("#cal-month").textContent = first.toLocaleDateString(undefined, { month: "long", year: "numeric" });
     renderMonthStats();
   }
 
@@ -105,7 +107,7 @@ export function mount(el, arg) {
     el.querySelector("[data-mstats]").innerHTML = `
       <div class="month-stat"><strong>${active}</strong><span>active days</span></div>
       <div class="month-stat"><strong>${perfect}</strong><span>perfect days</span></div>
-      <div class="month-stat"><strong>${total ? Math.round((done / total) * 100) : 0}%</strong><span>completion</span></div>`;
+      <div class="month-stat"><strong>${total ? Math.round((done / total) * 100) : 0}%</strong><span>cleared</span></div>`;
   }
 
   async function loadMonth(direction = 0, quiet = false) {
@@ -116,14 +118,14 @@ export function mount(el, arg) {
       summary = Object.fromEntries(data.map((d) => [d.date, d]));
       renderGrid(direction, quiet);
     } catch (err) {
-      toast(`Couldn't load calendar: ${err.message}`, { tone: "error" });
+      toast(`Couldn't load the quest log: ${err.message}`, { tone: "error" });
     }
   }
 
   function shiftMonth(delta, focus) {
     month += delta;
-    if (month < 0) { month = 11; year -= 1; }
-    if (month > 11) { month = 0; year += 1; }
+    while (month < 0) { month += 12; year -= 1; }
+    while (month > 11) { month -= 12; year += 1; }
     if (focus) focusDate = focus;
     return loadMonth(delta);
   }
@@ -139,7 +141,7 @@ export function mount(el, arg) {
     renderMonthStats();
   }
 
-  function select(d, { open = true } = {}) {
+  function select(d) {
     selected = d;
     focusDate = d;
     grid.querySelectorAll(".tile[data-date]").forEach((t) => {
@@ -148,7 +150,7 @@ export function mount(el, arg) {
     });
     history.replaceState(null, "", `#/calendar/${d}`);
     if (desktop.matches) renderDay(panel, d);
-    else if (open) { renderDay(sheetBox, d); openDialog(sheet); }
+    else { renderDay(winBox, d); openDialog(win); }
   }
 
   grid.addEventListener("click", (e) => {
@@ -163,9 +165,7 @@ export function mount(el, arg) {
     e.preventDefault();
     const target = addDays(focusDate, step);
     const t = parseISO(target);
-    if (t.getMonth() !== month || t.getFullYear() !== year) {
-      await shiftMonth(step > 0 ? 1 : -1, target);
-    }
+    if (t.getMonth() !== month || t.getFullYear() !== year) await shiftMonth(step > 0 ? 1 : -1, target);
     focusDate = target;
     grid.querySelectorAll(".tile[data-date]").forEach((tile) => { tile.tabIndex = tile.dataset.date === target ? 0 : -1; });
     grid.querySelector(`[data-date="${target}"]`)?.focus();
@@ -190,9 +190,9 @@ export function mount(el, arg) {
     else select(today);
   });
 
-  // ---------- day details ----------
+  // ---------- day record ----------
   async function renderDay(box, d) {
-    box.innerHTML = `<div class="daybox"><div class="skeleton" style="height:52px"></div><div class="skeleton" style="height:44px"></div><div class="skeleton" style="height:44px"></div></div>`;
+    box.innerHTML = `<div class="daybox"><div class="skeleton" style="height:48px"></div><div class="skeleton" style="height:60px"></div><div class="skeleton" style="height:60px"></div></div>`;
     let data;
     try {
       data = await api.day(d);
@@ -206,95 +206,93 @@ export function mount(el, arg) {
     box.innerHTML = `
       <div class="daybox swap">
         <div class="daybox-head">
-          <div>
-            <h2>${esc(relativeDay(d))}</h2>
-            <p>${esc(fmt(d, { month: "long", day: "numeric", year: "numeric" }))} · <span data-day-count></span></p>
-          </div>
-          ${ring()}
+          <h3>${esc(relativeDay(d))}</h3>
+          <p>${esc(fmt(d, { month: "long", day: "numeric", year: "numeric" }))} · <span data-day-count></span></p>
         </div>
-        ${future ? `<p class="note">Planning ahead. You can check these off when the day comes.</p>` : ""}
-        <ul class="checklist" data-list></ul>
+        ${future ? `<p class="note">Planning ahead. These quests unlock when the day arrives.</p>` : ""}
+        <div class="day-quests" data-list></div>
         <form class="quick-add" data-quick>
-          <label class="sr-only" for="qa-${d}">Add a task for ${esc(fmt(d, { month: "long", day: "numeric" }))}</label>
-          <input class="input" id="qa-${d}" maxlength="80" autocomplete="off" placeholder="Add a task for this day…" />
+          <label class="sr-only" for="qa-${d}">Add a quest for ${esc(fmt(d, { month: "long", day: "numeric" }))}</label>
+          <input class="input" id="qa-${d}" maxlength="80" autocomplete="off" placeholder="Add a quest for this day…" />
           <button class="btn btn-primary" type="submit">Add</button>
         </form>
-        <button class="btn btn-ghost" type="button" data-new-habit style="justify-self:start">${icon("repeat", "icon-sm")} New daily habit</button>
+        <div style="display:flex;flex-wrap:wrap;gap:4px">
+          <button class="btn btn-text" type="button" data-info>${icon("info", "icon-sm")} Quest info</button>
+          <button class="btn btn-text" type="button" data-new-goal>${icon("repeat", "icon-sm")} New daily quest</button>
+        </div>
       </div>`;
 
     const list = box.querySelector("[data-list]");
-    const ringSvg = box.querySelector(".ring");
 
     const sync = () => {
       const done = data.tasks.filter((t) => t.completed).length;
       const total = data.tasks.length;
-      box.querySelector("[data-day-count]").textContent = total ? `${done}/${total} done` : "no tasks";
-      setRing(ringSvg, done, total);
+      box.querySelector("[data-day-count]").textContent = total ? `${done}/${total} cleared` : "no quests";
       summary[d] = { date: d, done, total };
       updateTile(d);
     };
 
     const rowHTML = (t, i) => `
-      <li class="check-row" style="--i:${i}" data-id="${t.id}">
-        <label>
-          <input type="checkbox" ${t.completed ? "checked" : ""} ${future ? "disabled" : ""} />
-          <span class="check-title">${esc(t.title)}</span>
-        </label>
-        <span class="chip">${t.is_permanent ? `${icon("repeat")} Daily` : "Once"}</span>
-        ${t.is_permanent ? "" : `<button class="icon-btn" type="button" data-delete aria-label="Delete ${esc(t.title)}">${icon("trash", "icon-sm")}</button>`}
-      </li>`;
+      <article class="sys quest${t.completed ? " is-done" : ""}" style="--i:${i}" data-id="${t.id}">
+        <button class="quest-main" type="button" data-open aria-label="${esc(t.title)}, ${questKind(t)}. Open quest">
+          <strong>${esc(t.title)}</strong><small>${questKind(t)}</small>
+        </button>
+        <span class="status-text" aria-hidden="true">${statusText(t)}</span>
+        <button class="box-check" type="button" role="checkbox" aria-checked="${t.completed}" data-check
+                aria-label="${esc(t.title)} complete" ${future ? "disabled" : ""}><i>${icon("check")}</i></button>
+      </article>`;
 
-    const renderList = () => {
+    const renderList = (quiet = false) => {
       list.innerHTML = data.tasks.length
         ? data.tasks.map(rowHTML).join("")
-        : `<li class="note">Nothing here yet. Add a one-off task below.</li>`;
+        : `<p class="empty-line">No quests recorded. Add one below.</p>`;
+      if (quiet) list.querySelectorAll(".quest").forEach((q) => q.classList.add("static"));
     };
     renderList();
     sync();
 
-    list.addEventListener("change", async (e) => {
-      const row = e.target.closest(".check-row");
-      const t = data.tasks.find((x) => x.id === Number(row.dataset.id));
-      const next = e.target.checked;
-      t.completed = next;
-      sync();
-      try {
-        await api.complete(d, t.id, next);
-        changed({ kind: "completion", source: "calendar" });
-      } catch (err) {
-        t.completed = !next;
-        e.target.checked = !next;
+    list.addEventListener("click", async (e) => {
+      const card = e.target.closest(".quest[data-id]");
+      if (!card) return;
+      const t = data.tasks.find((x) => x.id === Number(card.dataset.id));
+      if (e.target.closest("[data-check]")) {
+        const saving = toggleDone(t, d, { source: "calendar", el: card });
+        renderList(true);
+        if (t.completed) replayClass(list.querySelector(`[data-id="${t.id}"]`), "flash");
         sync();
-        toast(`Couldn't save: ${err.message}`, { tone: "error" });
+        if (!(await saving)) { renderList(true); sync(); }
+      } else if (e.target.closest("[data-open]")) {
+        openQuest(t, d, {
+          source: "calendar",
+          onToggle: () => { renderList(true); sync(); },
+          onClose: () => { renderList(true); sync(); },
+          onRemove: removeQuest,
+        });
       }
     });
 
-    list.addEventListener("click", (e) => {
-      const btn = e.target.closest("[data-delete]");
-      if (!btn) return;
-      const row = btn.closest(".check-row");
-      const idx = data.tasks.findIndex((x) => x.id === Number(row.dataset.id));
-      const [t] = data.tasks.splice(idx, 1);
-      row.classList.add("is-leaving");
-      const hide = () => { row.hidden = true; };
-      if (reducedMotion()) hide(); else row.addEventListener("animationend", hide, { once: true });
+    function removeQuest(t) {
+      const idx = data.tasks.indexOf(t);
+      data.tasks.splice(idx, 1);
+      renderList(true);
       sync();
-      withUndo("Task deleted", {
+      withUndo(t.is_permanent ? `Daily Quest abandoned: ${t.title}` : `Quest deleted: ${t.title}`, {
         commit: async () => {
           try {
-            await api.remove(t.id);
+            await (t.is_permanent ? api.archive(t.id) : api.remove(t.id));
             changed({ kind: "removed", source: "calendar" });
           } catch (err) {
-            toast(`Couldn't delete: ${err.message}`, { tone: "error" });
+            toast(`Couldn't remove: ${err.message}`, { tone: "error" });
           }
+          loadMonth(0, true);
         },
         undo: () => {
           data.tasks.splice(idx, 0, t);
-          renderList();
+          renderList(true);
           sync();
         },
       });
-    });
+    }
 
     box.querySelector("[data-quick]").addEventListener("submit", async (e) => {
       e.preventDefault();
@@ -305,7 +303,8 @@ export function mount(el, arg) {
       try {
         const t = await api.create({ title: value, is_permanent: false, specific_date: d });
         data.tasks.push(t);
-        renderList();
+        renderList(true);
+        list.lastElementChild?.classList.remove("static");
         sync();
         input.value = "";
         changed({ kind: "created", source: "calendar" });
@@ -317,17 +316,23 @@ export function mount(el, arg) {
       }
     });
 
-    box.querySelector("[data-new-habit]").addEventListener("click", () => openAdd({ kind: "daily" }));
+    box.querySelector("[data-info]").addEventListener("click", () =>
+      openQuestInfo(data.tasks, d, {
+        source: "calendar",
+        onClose: () => { renderList(true); sync(); },
+      }),
+    );
+    box.querySelector("[data-new-goal]").addEventListener("click", () => openAdd({ kind: "daily" }));
   }
 
   const onBreakpoint = () => {
-    if (desktop.matches) { closeDialog(sheet); renderDay(panel, selected); }
+    if (desktop.matches) { closeDialog(win); renderDay(panel, selected); }
   };
   desktop.addEventListener("change", onBreakpoint);
 
   loadMonth().then(() => {
     if (desktop.matches) renderDay(panel, selected);
-    else if (isValidISO(arg)) select(arg); // deep link opens the sheet on mobile
+    else if (isValidISO(arg)) select(arg); // deep link opens the day on phones
   });
 
   return {
@@ -335,12 +340,12 @@ export function mount(el, arg) {
       if (detail.source === "calendar") return;
       loadMonth(0, true);
       if (desktop.matches) renderDay(panel, selected);
-      else if (sheet.open) renderDay(sheetBox, selected);
+      else if (win.open) renderDay(winBox, selected);
     },
     unmount() {
       alive = false;
       desktop.removeEventListener("change", onBreakpoint);
-      sheet.remove();
+      win.remove();
     },
   };
 }

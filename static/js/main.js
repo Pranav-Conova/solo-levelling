@@ -1,11 +1,12 @@
 import { api } from "./api.js";
 import { openAdd } from "./add.js";
-import { confetti, esc, icon, pref, replayClass, setPref } from "./util.js";
+import { esc, initial, makeWindow, openDialog, particles, pref, replayClass, userName, winHead, wireClose } from "./util.js";
 import * as home from "./views/home.js";
 import * as calendar from "./views/calendar.js";
 import * as profile from "./views/profile.js";
+import * as welcome from "./views/welcome.js";
 
-const routes = { "": home, calendar, profile };
+const routes = { "": home, calendar, profile, welcome };
 const viewEl = document.getElementById("view");
 const mainEl = document.getElementById("main");
 let current = null;
@@ -14,6 +15,8 @@ let firstRoute = true;
 // ---------- router (hash based: deep links + a working back button) ----------
 function route() {
   const [page = "", arg] = location.hash.replace(/^#\/?/, "").split("/");
+  // first visit goes through the awakening screen once
+  if (page !== "welcome" && !pref("awakened")) { location.replace("#/welcome"); return; }
   const key = page in routes ? page : "";
   const view = routes[key];
 
@@ -35,97 +38,50 @@ function route() {
 }
 addEventListener("hashchange", route);
 
-// ---------- create buttons ----------
 document.querySelectorAll("[data-open-add]").forEach((b) => b.addEventListener("click", () => openAdd()));
 
-// ---------- theme ----------
-const darkQuery = matchMedia("(prefers-color-scheme: dark)");
-const effectiveTheme = () => document.documentElement.dataset.theme || (darkQuery.matches ? "dark" : "light");
-
-function renderThemeButtons() {
-  const dark = effectiveTheme() === "dark";
-  document.querySelectorAll("[data-theme-toggle]").forEach((btn) => {
-    btn.querySelector("use").setAttribute("href", dark ? "#i-sun" : "#i-moon");
-    btn.setAttribute("aria-label", dark ? "Switch to light mode" : "Switch to dark mode");
-  });
-  document.querySelectorAll("[data-theme-label]").forEach((s) => { s.textContent = dark ? "Light mode" : "Dark mode"; });
-  document.querySelectorAll('meta[name="theme-color"]').forEach((m) => { m.content = dark ? "#000000" : "#ffffff"; });
+function renderAvatar() {
+  document.querySelectorAll("[data-avatar]").forEach((a) => { a.textContent = initial(userName()); });
 }
 
-document.querySelectorAll("[data-theme-toggle]").forEach((btn) =>
-  btn.addEventListener("click", () => {
-    const next = effectiveTheme() === "dark" ? "light" : "dark";
-    document.documentElement.dataset.theme = next;
-    setPref("theme", next);
-    renderThemeButtons();
-  }),
-);
-darkQuery.addEventListener("change", renderThemeButtons);
-if (pref("theme")) document.documentElement.dataset.theme = pref("theme");
-renderThemeButtons();
-
-// ---------- streak chip + level-up ----------
+// ---------- level up ----------
 let lastLevel = null;
 
-function renderStreak(stats) {
-  document.querySelectorAll("[data-streak-chip]").forEach((chip) => {
-    const prev = chip.dataset.value;
-    chip.hidden = false;
-    chip.dataset.value = stats.current_streak;
-    chip.innerHTML = `${icon("flame")}<span>${stats.current_streak}</span>`;
-    chip.setAttribute("aria-label", `${stats.current_streak} day streak`);
-    chip.setAttribute("role", "img");
-    if (prev !== undefined && Number(prev) < stats.current_streak) replayClass(chip, "bump");
-  });
-}
-
-function celebrate(stats) {
-  const opener = document.activeElement;
-  const overlay = document.createElement("div");
-  overlay.className = "celebrate";
-  overlay.setAttribute("role", "alertdialog");
-  overlay.setAttribute("aria-modal", "true");
-  overlay.setAttribute("aria-labelledby", "lvl-title");
-  overlay.innerHTML = `
-    <div class="celebrate-card">
-      <p class="kicker" id="lvl-title">Level up</p>
-      <p class="lvl">${stats.level}</p>
-      <p>You're now Rank ${esc(stats.rank)}. Keep stacking days.</p>
-      <button class="btn" type="button">Continue</button>
+function levelUp(stats) {
+  const dlg = makeWindow("Level up");
+  dlg.innerHTML = `
+    <div class="win-body sys">
+      ${winHead("Notification", "alert")}
+      <div class="levelup">
+        <p class="big">Level Up!</p>
+        <p class="lvl-num">${stats.level}</p>
+        <p>You have leveled up. Title: <strong>${esc(stats.rank)}-Rank Hunter</strong>.</p>
+        <button class="btn btn-primary btn-block" type="button" data-close>Continue</button>
+      </div>
     </div>`;
-  document.body.appendChild(overlay);
-  const btn = overlay.querySelector("button");
-  btn.focus();
-  confetti(overlay.querySelector(".celebrate-card"));
-
-  const close = () => {
-    overlay.classList.add("is-leaving");
-    setTimeout(() => overlay.remove(), 260);
-    opener?.focus?.();
-  };
-  btn.addEventListener("click", close);
-  overlay.addEventListener("click", (e) => { if (e.target === overlay) close(); });
-  overlay.addEventListener("keydown", (e) => {
-    if (e.key === "Escape" || e.key === "Tab") { e.preventDefault(); if (e.key === "Escape") close(); }
-  });
+  wireClose(dlg);
+  openDialog(dlg, "level");
+  setTimeout(() => particles(dlg.querySelector(".lvl-num"), 30), 450);
 }
 
-async function refreshStats() {
+async function checkLevel() {
   try {
     const stats = await api.stats();
-    renderStreak(stats);
-    if (lastLevel !== null && stats.level > lastLevel) celebrate(stats);
+    if (lastLevel !== null && stats.level > lastLevel) levelUp(stats);
     lastLevel = stats.level;
-  } catch (e) { /* the chip is decorative; views report their own errors */ }
+  } catch (e) { /* views report their own errors */ }
 }
 
 // one place fans data changes out to the current view and the shell
 let statsTimer;
 document.addEventListener("tracker:changed", (e) => {
-  current?.refresh?.(e.detail || {});
+  const detail = e.detail || {};
+  if (detail.kind === "name") { renderAvatar(); return; }
+  current?.refresh?.(detail);
   clearTimeout(statsTimer);
-  statsTimer = setTimeout(refreshStats, 250);
+  statsTimer = setTimeout(checkLevel, 300);
 });
 
+renderAvatar();
 route();
-refreshStats();
+checkLevel();
