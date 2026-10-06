@@ -48,6 +48,15 @@ Open http://localhost:8000
 
 By default it uses a local SQLite file (`tracker.db`). Set `DATABASE_URL` to a Postgres URL to use Postgres instead. New columns are added automatically on startup, so existing databases keep working.
 
+## Health check and background pinger
+
+- `GET /api/health` (also `HEAD`) needs no login. It returns `{"status": "ok", "database": "ok"}`, or HTTP 503 if the database can't be reached. Render uses it as the service health check (`healthCheckPath` in `render.yaml`).
+- **Background pinger:** set `PING_URL` and the app calls that URL every 10 minutes for as long as it runs. If `PING_URL` is unset or empty, the worker isn't started. Failed requests are logged and retried on the next tick, and never crash the app.
+- On Render's free plan, an idle service sleeps after about 15 minutes. Setting `PING_URL=https://<your-service>.onrender.com/api/health` keeps it awake (one always-on service fits in the free 750 hours a month).
+- `PING_INTERVAL_SECONDS` optionally overrides the 10 minutes. It's mainly for testing.
+- Settings can live in a `.env` file locally (see `.env.example`). Real environment variables take priority.
+- If you run uvicorn with several `--workers`, each worker pings on its own.
+
 ## Deploy to Render
 
 1. Push this repo to GitHub.
@@ -65,6 +74,8 @@ pytest
 ## API
 
 All quest endpoints require a logged-in session.
+
+- `GET /api/health`: health check (public)
 
 - `GET /api/auth/me`: session state (plus whether sign-up is open)
 - `POST /api/auth/register` / `POST /api/auth/login`: `{username, password}`

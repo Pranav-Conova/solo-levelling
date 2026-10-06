@@ -1,4 +1,6 @@
+import asyncio
 import os
+from contextlib import asynccontextmanager, suppress
 from datetime import date, datetime, timedelta, timezone
 from typing import Optional
 
@@ -9,7 +11,7 @@ from sqlalchemy import inspect, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
-from . import auth, crud, models, schemas
+from . import auth, crud, models, pinger, schemas
 from .auth import current_user
 from .database import Base, engine, get_db
 
@@ -36,7 +38,20 @@ _migrate()
 # The very first account can always be created, so a fresh deploy is never locked out.
 ALLOW_REGISTRATION = os.getenv("ALLOW_REGISTRATION", "true").strip().lower() not in {"0", "false", "no", "off"}
 
-app = FastAPI(title="Solo Levelling")
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # the pinger only runs when PING_URL is configured
+    config = pinger.config_from_env()
+    task = asyncio.create_task(pinger.run(*config)) if config else None
+    app.state.pinger = task
+    yield
+    if task:
+        task.cancel()
+        with suppress(asyncio.CancelledError):
+            await task
+
+
+app = FastAPI(title="Solo Levelling", lifespan=lifespan)
 
 
 @app.middleware("http")
@@ -53,6 +68,17 @@ async def guard_and_cache(request: Request, call_next):
     if request.url.path.startswith("/api/"):
         response.headers["Cache-Control"] = "no-store"
     return response
+
+
+# ---------- health ----------
+@app.api_route("/api/health", methods=["GET", "HEAD"])
+def health(db: Session = Depends(get_db)):
+    """Liveness + database check for Render's health check, uptime monitors and the pinger."""
+    try:
+        db.execute(text("SELECT 1"))
+    except Exception:
+        return JSONResponse({"status": "error", "database": "unreachable"}, status_code=503)
+    return {"status": "ok", "database": "ok"}
 
 
 # ---------- accounts ----------
