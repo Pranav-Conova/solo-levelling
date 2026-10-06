@@ -4,8 +4,10 @@ A self-improvement tracker styled after the System from the *Solo Leveling* anim
 
 Quests are plain text, so they can be anything: "Study for 1 hour", "Read 20 pages", "Call mom". Each quest is either:
 
-- **Daily Quest**: arrives every day from the day you create it. Abandoning it keeps its past record.
+- **Repeating quest**: arrives every N days from the day you create it, where you choose N. 1 means daily, 2 means every other day, 5 means every fifth day, up to 365. It only shows on its scheduled days. On other days it's listed under "Resting today" with its next due date. Its streak counts scheduled runs completed in a row, so off days never break it. Abandoning it keeps its past record.
 - **Personal quest**: belongs to a single day.
+
+There's also a separate **Applications** page (the Jobs tab) for your job hunt. For each role it records the company name, the role, its status (Applied, Interviewing, Offer, Rejected or Withdrawn), how you applied (LinkedIn, referral, company website…) and the date. You can change a status straight from the list, filter by status (for example `#/jobs/interviewing`), and edit or delete with Undo. Applications are private to each Player.
 
 ## Accounts
 
@@ -84,11 +86,15 @@ All quest endpoints require a logged-in session.
 - `POST /api/auth/logout`
 - `POST /api/auth/password`: `{current_password, new_password}`
 
-- `POST /api/tasks`: create a quest `{title, is_permanent, specific_date?, start_date?}`
+- `POST /api/tasks`: create a quest `{title, is_permanent, specific_date?, start_date?, interval_days?}`. `interval_days` is 1–365 for repeating quests (default 1).
 - `GET /api/days/{date}`: quests and completion for a date
 - `POST /api/days/{date}/tasks/{task_id}/completion`: `{completed: true/false}`
 - `DELETE /api/tasks/{task_id}`: delete a quest and its history
 - `POST /api/tasks/{task_id}/archive?on=YYYY-MM-DD`: stop a Daily Quest from that day on (history is kept)
 - `GET /api/calendar?start=YYYY-MM-DD&end=YYYY-MM-DD`: per-day cleared/total counts
-- `GET /api/habits?today=YYYY-MM-DD`: active Daily Quests with streaks
+- `GET /api/habits?today=YYYY-MM-DD`: active repeating quests with interval, streak, `due_today` and `next_due`
 - `GET /api/stats?today=YYYY-MM-DD`: EXP, level, rank and streaks
+- `GET /api/applications`: your job applications, newest first
+- `POST /api/applications`: `{company, role, status?, applied_via?, applied_on?}`, where status is `applied | interviewing | offer | rejected | withdrawn`
+- `PATCH /api/applications/{id}`: change any of those fields
+- `DELETE /api/applications/{id}`

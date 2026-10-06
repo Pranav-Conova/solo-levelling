@@ -1,8 +1,8 @@
 import { api, changed } from "./api.js";
 import { openAdd } from "./add.js";
 import {
-  closeDialog, esc, fmt, haptic, icon, makeWindow, openDialog, particles, plural,
-  questKind, replayClass, todayISO, toast, winHead, wireClose,
+  closeDialog, esc, everyText, fmt, gapOf, haptic, icon, makeWindow, openDialog, particles, plural,
+  questKind, relativeDay, replayClass, todayISO, toast, winHead, wireClose,
 } from "./util.js";
 
 /**
@@ -30,10 +30,14 @@ export async function toggleDone(task, date, { source, el } = {}) {
 function metaHTML(t, info) {
   // done state is shown by the filled box, the strike line and dimming: no extra text, so rows never change height
   if (!t.is_permanent) return `<span class="goal-kind">Personal</span><span>one day only</span>`;
+  const gap = gapOf(t);
+  const tag = `<span class="goal-kind">${gap > 1 ? `Every ${gap} days` : "Daily"}</span>`;
   // without habit data (e.g. a past day in the Quest Log) don't guess at the streak
-  if (!info) return `<span class="goal-kind">Daily</span><span>every day</span>`;
-  return `<span class="goal-kind">Daily</span>${info.streak
-    ? `<span class="goal-streak">${icon("flame")}${info.streak}-day streak</span>`
+  if (!info) return `${tag}<span>${gap > 1 ? "repeating" : "every day"}</span>`;
+  // for gap quests the streak counts scheduled runs, so off days never break it
+  const streak = gap > 1 ? `${info.streak} in a row` : `${info.streak}-day streak`;
+  return `${tag}${info.streak
+    ? `<span class="goal-streak">${icon("flame")}${streak}</span>`
     : `<span>start a streak today</span>`}`;
 }
 
@@ -140,12 +144,16 @@ export function openQuest(task, date, { source, onRemove, onClose, onToggle, inf
   const dlg = makeWindow(task.title);
   dlg.addEventListener("close", () => onClose?.());
 
+  const gap = gapOf(task);
   const facts = [
-    ["Type", questKind(task)],
-    task.is_permanent
-      ? ["Since", fmt(task.start_date, { month: "short", day: "numeric", year: "numeric" })]
-      : ["Day", fmt(date, { weekday: "short", month: "short", day: "numeric" })],
-    ...(info ? [["Streak", plural(info.streak, "day")], ["Cleared", plural(info.total_done, "day")]] : []),
+    ["Type", task.is_permanent ? "Repeating" : "Personal"],
+    task.is_permanent ? ["Repeats", everyText(gap)] : ["Day", fmt(date, { weekday: "short", month: "short", day: "numeric" })],
+    ...(task.is_permanent ? [["Since", fmt(task.start_date, { month: "short", day: "numeric", year: "numeric" })]] : []),
+    ...(info ? [
+      ["Next due", info.next_due === todayISO() ? "Today" : relativeDay(info.next_due) === "Tomorrow" ? "Tomorrow" : fmt(info.next_due, { weekday: "short", month: "short", day: "numeric" })],
+      ["Streak", gap > 1 ? `${info.streak} in a row` : plural(info.streak, "day")],
+      ["Cleared", plural(info.total_done, "time")],
+    ] : []),
   ];
 
   dlg.innerHTML = `

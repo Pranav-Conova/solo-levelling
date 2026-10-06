@@ -48,6 +48,11 @@ export const api = {
   complete: (date, id, completed) => request("POST", `/api/days/${date}/tasks/${id}/completion`, { completed }),
   remove: (id) => request("DELETE", `/api/tasks/${id}`),
   archive: (id) => request("POST", `/api/tasks/${id}/archive?on=${todayISO()}`),
+
+  applications: () => request("GET", "/api/applications"),
+  createApplication: (body) => request("POST", "/api/applications", body),
+  updateApplication: (id, body) => request("PATCH", `/api/applications/${id}`, body),
+  deleteApplication: (id) => request("DELETE", `/api/applications/${id}`),
 };
 
 // Views listen for this to refresh after any mutation made elsewhere

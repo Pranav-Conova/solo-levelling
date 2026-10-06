@@ -30,6 +30,9 @@ def _migrate():
             # existing quests stay unowned until the first account claims them
             conn.execute(text("ALTER TABLE tasks ADD COLUMN user_id INTEGER REFERENCES users(id)"))
             conn.execute(text("CREATE INDEX IF NOT EXISTS ix_tasks_user_id ON tasks (user_id)"))
+        if "interval_days" not in columns:
+            # every existing repeating quest was a daily one
+            conn.execute(text("ALTER TABLE tasks ADD COLUMN interval_days INTEGER NOT NULL DEFAULT 1"))
 
 
 _migrate()
@@ -228,6 +231,41 @@ def get_habits(today: Optional[date] = None, db: Session = Depends(get_db), user
 @app.get("/api/stats", response_model=schemas.Stats)
 def get_stats(today: Optional[date] = None, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
     return crud.get_stats(db, today or date.today(), user.id)
+
+
+# ---------- job applications (scoped to the logged-in Player) ----------
+def _now() -> datetime:
+    return datetime.now(timezone.utc).replace(tzinfo=None)
+
+
+def _owned_application(db: Session, app_id: int, user: models.User) -> models.JobApplication:
+    row = crud.get_application(db, app_id, user.id)
+    if row is None:
+        raise HTTPException(status_code=404, detail="Application not found")
+    return row
+
+
+@app.get("/api/applications", response_model=list[schemas.ApplicationOut])
+def list_applications(db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    return crud.list_applications(db, user.id)
+
+
+@app.post("/api/applications", response_model=schemas.ApplicationOut, status_code=201)
+def create_application(body: schemas.ApplicationIn, db: Session = Depends(get_db),
+                       user: models.User = Depends(current_user)):
+    return crud.create_application(db, body, user.id, _now())
+
+
+@app.patch("/api/applications/{app_id}", response_model=schemas.ApplicationOut)
+def update_application(app_id: int, body: schemas.ApplicationPatch, db: Session = Depends(get_db),
+                       user: models.User = Depends(current_user)):
+    return crud.update_application(db, _owned_application(db, app_id, user), body, _now())
+
+
+@app.delete("/api/applications/{app_id}")
+def delete_application(app_id: int, db: Session = Depends(get_db), user: models.User = Depends(current_user)):
+    crud.delete_application(db, _owned_application(db, app_id, user))
+    return {"ok": True}
 
 
 app.mount("/static", StaticFiles(directory="static"), name="static")

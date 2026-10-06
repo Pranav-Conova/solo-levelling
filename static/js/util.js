@@ -53,7 +53,10 @@ export const initial = (title) => (title.trim().match(/[\p{L}\p{N}]/u) || ["?"])
 export const icon = (name, cls = "") =>
   `<svg class="icon ${cls}" aria-hidden="true"><use href="#i-${name}"/></svg>`;
 
-export const questKind = (t) => (t.is_permanent ? "Daily Quest" : "Personal Added");
+// repeating quests run every `interval_days` days (1 = daily)
+export const gapOf = (t) => Math.max(1, t.interval_days || 1);
+export const everyText = (n) => (n > 1 ? `Every ${n} days` : "Every day");
+export const questKind = (t) => (!t.is_permanent ? "Personal Added" : gapOf(t) > 1 ? `Every ${gapOf(t)} days` : "Daily Quest");
 
 // heat level 0-3 for a day's completion ratio
 export function heat(done, total) {

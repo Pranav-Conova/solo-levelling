@@ -40,12 +40,20 @@ class Task(Base):
     archived = Column(Boolean, nullable=False, default=False)
     # for permanent tasks: first day they no longer appear (history before it is kept)
     archived_on = Column(Date, nullable=True)
+    # for permanent tasks: 1 = every day, 2 = every other day, 5 = every fifth day... counted from start_date
+    interval_days = Column(Integer, nullable=False, default=1)
 
     completions = relationship("Completion", back_populates="task", cascade="all, delete-orphan")
 
+    @property
+    def step(self) -> int:
+        return max(1, self.interval_days or 1)
+
     def applies_to(self, day) -> bool:
         if self.is_permanent:
-            return self.start_date <= day and (self.archived_on is None or day < self.archived_on)
+            if day < self.start_date or (self.archived_on is not None and day >= self.archived_on):
+                return False
+            return (day - self.start_date).days % self.step == 0
         return self.specific_date == day
 
 
@@ -59,3 +67,19 @@ class Completion(Base):
     completed = Column(Boolean, nullable=False, default=False)
 
     task = relationship("Task", back_populates="completions")
+
+
+class JobApplication(Base):
+    __tablename__ = "job_applications"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    company = Column(String, nullable=False)
+    role = Column(String, nullable=False)
+    # applied | interviewing | offer | rejected | withdrawn
+    status = Column(String, nullable=False, default="applied")
+    # how the Player applied: LinkedIn, referral, company website...
+    applied_via = Column(String, nullable=True)
+    applied_on = Column(Date, nullable=False)
+    created_at = Column(DateTime, nullable=False)
+    updated_at = Column(DateTime, nullable=False)

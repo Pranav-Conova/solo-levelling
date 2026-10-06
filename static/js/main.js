@@ -6,8 +6,9 @@ import * as calendar from "./views/calendar.js";
 import * as profile from "./views/profile.js";
 import * as welcome from "./views/welcome.js";
 import * as login from "./views/login.js";
+import * as jobs from "./views/applications.js";
 
-const routes = { "": home, calendar, profile, welcome, login };
+const routes = { "": home, calendar, jobs, profile, welcome, login };
 const PUBLIC = new Set(["welcome", "login"]); // reachable without an account
 const viewEl = document.getElementById("view");
 const mainEl = document.getElementById("main");

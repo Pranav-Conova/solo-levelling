@@ -1,5 +1,5 @@
 from datetime import date
-from typing import Optional
+from typing import Literal, Optional
 
 from pydantic import BaseModel, Field, field_validator
 
@@ -41,6 +41,8 @@ class TaskCreate(BaseModel):
     specific_date: Optional[date] = None
     # only used when is_permanent is True; lets the client send its local "today"
     start_date: Optional[date] = None
+    # only used when is_permanent is True: 1 = every day, 2 = every other day, ...
+    interval_days: int = Field(default=1, ge=1, le=365)
 
 
 class TaskOut(BaseModel):
@@ -50,6 +52,7 @@ class TaskOut(BaseModel):
     specific_date: Optional[date]
     start_date: date
     completed: bool
+    interval_days: int = 1
 
     class Config:
         from_attributes = True
@@ -76,9 +79,13 @@ class HabitOut(BaseModel):
     id: int
     title: str
     start_date: date
+    interval_days: int
+    due_today: bool
     completed_today: bool
+    # scheduled runs completed in a row (for every-N-day quests, off days don't break it)
     streak: int
     total_done: int
+    next_due: date
 
 
 class Stats(BaseModel):
@@ -92,3 +99,53 @@ class Stats(BaseModel):
     level_start_xp: int
     next_level_xp: int
     rank: str
+
+
+# ---------- job applications ----------
+ApplicationStatus = Literal["applied", "interviewing", "offer", "rejected", "withdrawn"]
+
+
+class ApplicationIn(BaseModel):
+    company: str = Field(min_length=1, max_length=80)
+    role: str = Field(min_length=1, max_length=80)
+    status: ApplicationStatus = "applied"
+    applied_via: Optional[str] = Field(default=None, max_length=60)
+    applied_on: Optional[date] = None
+
+    @field_validator("company", "role")
+    @classmethod
+    def not_blank(cls, v: str) -> str:
+        v = v.strip()
+        if not v:
+            raise ValueError("can't be empty")
+        return v
+
+
+class ApplicationPatch(BaseModel):
+    company: Optional[str] = Field(default=None, min_length=1, max_length=80)
+    role: Optional[str] = Field(default=None, min_length=1, max_length=80)
+    status: Optional[ApplicationStatus] = None
+    applied_via: Optional[str] = Field(default=None, max_length=60)
+    applied_on: Optional[date] = None
+
+    @field_validator("company", "role")
+    @classmethod
+    def not_blank(cls, v: Optional[str]) -> Optional[str]:
+        if v is None:
+            return v
+        v = v.strip()
+        if not v:
+            raise ValueError("can't be empty")
+        return v
+
+
+class ApplicationOut(BaseModel):
+    id: int
+    company: str
+    role: str
+    status: ApplicationStatus
+    applied_via: Optional[str]
+    applied_on: date
+
+    class Config:
+        from_attributes = True

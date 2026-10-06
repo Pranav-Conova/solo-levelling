@@ -27,6 +27,7 @@ def create_task(db: Session, task_in: schemas.TaskCreate, user_id: int) -> model
             is_permanent=True,
             specific_date=None,
             start_date=task_in.start_date or today,
+            interval_days=task_in.interval_days,
         )
     else:
         target_date = task_in.specific_date or today
@@ -73,7 +74,7 @@ def _permanent_active_between(start: date, end: date):
 
 
 def _tasks_for_date(db: Session, target_date: date, user_id: int) -> list[models.Task]:
-    return (
+    candidates = (
         db.query(models.Task)
         .filter(
             models.Task.user_id == user_id,
@@ -85,6 +86,8 @@ def _tasks_for_date(db: Session, target_date: date, user_id: int) -> list[models
         .order_by(models.Task.is_permanent.desc(), models.Task.id)
         .all()
     )
+    # every-N-day quests only show up on their scheduled days
+    return [t for t in candidates if t.applies_to(target_date)]
 
 
 def get_day(db: Session, target_date: date, user_id: int) -> schemas.DayTasks:
@@ -107,6 +110,7 @@ def get_day(db: Session, target_date: date, user_id: int) -> schemas.DayTasks:
             specific_date=t.specific_date,
             start_date=t.start_date,
             completed=t.id in completed_ids,
+            interval_days=t.step,
         )
         for t in tasks
     ]
@@ -229,6 +233,38 @@ def get_stats(db: Session, today: date, user_id: int) -> schemas.Stats:
     )
 
 
+def _last_scheduled(task: models.Task, on_or_before: date) -> date | None:
+    """The latest day <= on_or_before that the quest is scheduled for (None if it hasn't started)."""
+    offset = (on_or_before - task.start_date).days
+    if offset < 0:
+        return None
+    return on_or_before - timedelta(days=offset % task.step)
+
+
+def _run_streak(task: models.Task, done_pairs: set, today: date) -> int:
+    """Scheduled runs completed in a row; today's run still counts as open until the day ends."""
+    cursor = _last_scheduled(task, today)
+    if cursor is None:
+        return 0
+    if cursor == today and (task.id, today) not in done_pairs:
+        cursor -= timedelta(days=task.step)
+    streak = 0
+    while cursor >= task.start_date and (task.id, cursor) in done_pairs:
+        streak += 1
+        cursor -= timedelta(days=task.step)
+    return streak
+
+
+def _next_due(task: models.Task, done_today: bool, today: date) -> date:
+    if today < task.start_date:
+        return task.start_date
+    rem = (today - task.start_date).days % task.step
+    nxt = today if rem == 0 else today + timedelta(days=task.step - rem)
+    if nxt == today and done_today:
+        nxt += timedelta(days=task.step)
+    return nxt
+
+
 def get_habits(db: Session, today: date, user_id: int) -> list[schemas.HabitOut]:
     habits = (
         db.query(models.Task)
@@ -253,17 +289,21 @@ def get_habits(db: Session, today: date, user_id: int) -> list[schemas.HabitOut]
     )
     done_pairs = {(c.task_id, c.date) for c in completions}
 
-    return [
-        schemas.HabitOut(
+    out = []
+    for h in habits:
+        done_today = (h.id, today) in done_pairs
+        out.append(schemas.HabitOut(
             id=h.id,
             title=h.title,
             start_date=h.start_date,
-            completed_today=(h.id, today) in done_pairs,
-            streak=_current_streak(lambda d, h=h: (h.id, d) in done_pairs, today),
+            interval_days=h.step,
+            due_today=h.applies_to(today),
+            completed_today=done_today,
+            streak=_run_streak(h, done_pairs, today),
             total_done=sum(1 for task_id, d in done_pairs if task_id == h.id and d >= h.start_date),
-        )
-        for h in habits
-    ]
+            next_due=_next_due(h, done_today, today),
+        ))
+    return out
 
 
 # ---------- accounts ----------
@@ -278,3 +318,54 @@ def create_user(db: Session, username: str, password_hash: str, now) -> models.U
     db.commit()
     db.refresh(user)
     return user
+
+
+# ---------- job applications ----------
+def list_applications(db: Session, user_id: int) -> list[models.JobApplication]:
+    return (
+        db.query(models.JobApplication)
+        .filter(models.JobApplication.user_id == user_id)
+        .order_by(models.JobApplication.applied_on.desc(), models.JobApplication.id.desc())
+        .all()
+    )
+
+
+def get_application(db: Session, app_id: int, user_id: int) -> models.JobApplication | None:
+    row = db.get(models.JobApplication, app_id)
+    return row if row is not None and row.user_id == user_id else None
+
+
+def create_application(db: Session, data: schemas.ApplicationIn, user_id: int, now) -> models.JobApplication:
+    row = models.JobApplication(
+        user_id=user_id,
+        company=data.company,
+        role=data.role,
+        status=data.status,
+        applied_via=(data.applied_via or "").strip() or None,
+        applied_on=data.applied_on or date.today(),
+        created_at=now,
+        updated_at=now,
+    )
+    db.add(row)
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def update_application(db: Session, row: models.JobApplication, patch: schemas.ApplicationPatch, now) -> models.JobApplication:
+    changes = patch.model_dump(exclude_unset=True)
+    if "applied_via" in changes:
+        changes["applied_via"] = (changes["applied_via"] or "").strip() or None
+    for field, value in changes.items():
+        if value is None and field in {"company", "role", "status", "applied_on"}:
+            continue  # required fields can't be cleared
+        setattr(row, field, value)
+    row.updated_at = now
+    db.commit()
+    db.refresh(row)
+    return row
+
+
+def delete_application(db: Session, row: models.JobApplication) -> None:
+    db.delete(row)
+    db.commit()

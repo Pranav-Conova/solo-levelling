@@ -1,11 +1,13 @@
 import { api, changed } from "../api.js";
 import { openAdd } from "../add.js";
 import {
-  addDays, closeDialog, countUp, ding, esc, fmt, heat, icon, makeWindow, openDialog, parseISO, plural,
+  addDays, closeDialog, countUp, ding, esc, everyText, fmt, relativeDay, heat, icon, makeWindow, openDialog, parseISO, plural,
   reducedMotion, setPref, soundOn, toast, todayISO, userName, winHead, wireClose, withUndo,
 } from "../util.js";
 
 export const title = "Status";
+
+const nextLabel = (iso) => (["Today", "Tomorrow"].includes(relativeDay(iso)) ? relativeDay(iso).toLowerCase() : fmt(iso, { weekday: "short", month: "short", day: "numeric" }));
 
 const RANK_TITLES = { E: "E-Rank Hunter", D: "D-Rank Hunter", C: "C-Rank Hunter", B: "B-Rank Hunter", A: "A-Rank Hunter", S: "S-Rank Hunter" };
 
@@ -26,7 +28,7 @@ export function mount(el, arg) {
           <div class="tabs" role="tablist" aria-label="Status sections">
             <span class="tabs-ink" aria-hidden="true"></span>
             <button class="tab-btn" type="button" role="tab" id="tab-days" aria-controls="panel-days" data-tab="days">${icon("grid")} Records</button>
-            <button class="tab-btn" type="button" role="tab" id="tab-habits" aria-controls="panel-habits" data-tab="habits">${icon("list")} Daily Quests</button>
+            <button class="tab-btn" type="button" role="tab" id="tab-habits" aria-controls="panel-habits" data-tab="habits">${icon("list")} Quests</button>
           </div>
           <div role="tabpanel" id="panel-days" aria-labelledby="tab-days" data-panel="days" style="padding-top:16px"></div>
           <div role="tabpanel" id="panel-habits" aria-labelledby="tab-habits" data-panel="habits" style="padding-top:16px"></div>
@@ -221,8 +223,8 @@ export function mount(el, arg) {
     if (!habits.length) {
       panel.innerHTML = `
         <div class="sys empty">
-          <h3>No Daily Quests</h3>
-          <p>Daily Quests return every day until you abandon them.</p>
+          <h3>No repeating quests</h3>
+          <p>Repeating quests come back on their schedule until you abandon them.</p>
           <button class="btn btn-primary" type="button" data-new>Create a Daily Quest</button>
         </div>`;
       panel.querySelector("[data-new]").addEventListener("click", () => openAdd({ kind: "daily" }));
@@ -234,9 +236,9 @@ export function mount(el, arg) {
           <li class="sys habit-row" style="--i:${i}" data-id="${h.id}">
             <div>
               <strong>${esc(h.title)}</strong>
-              <small>Since ${esc(fmt(h.start_date, { month: "short", day: "numeric" }))} · ${plural(h.total_done, "day")} cleared${h.completed_today ? " · cleared today" : ""}</small>
+              <small>${everyText(h.interval_days)} · ${h.completed_today ? "cleared today" : h.due_today ? "due today" : `next ${esc(nextLabel(h.next_due))}`} · ${plural(h.total_done, "time")} cleared</small>
             </div>
-            <span class="streak" aria-label="${h.streak} day streak">${icon("flame")} ${h.streak}</span>
+            <span class="streak" aria-label="${h.interval_days > 1 ? `${h.streak} runs in a row` : `${h.streak} day streak`}">${icon("flame")} ${h.streak}</span>
             <button class="btn btn-sys btn-sm" type="button" data-stop>Abandon</button>
           </li>`).join("")}
       </ul>`;

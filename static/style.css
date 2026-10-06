@@ -295,6 +295,21 @@ dialog.win .win-head { padding: 0 34px; }
 .goal-toggle:disabled .goal-box { opacity: .4; }
 .goal-more { color: var(--text-3); }
 
+/* ---------- quests resting today (every-N-day quests not due) ---------- */
+.rest-list { display: grid; }
+.rest-list li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 2px 12px;
+  padding: 10px 10px;
+  border-top: 1px dashed var(--line-dim);
+}
+.rest-list li:last-child { border-bottom: 1px dashed var(--line-dim); }
+.rest-name { font-size: 18px; font-weight: 600; color: var(--text-2); overflow-wrap: anywhere; }
+.rest-next { font-size: 14px; color: var(--text-3); }
+
 /* ---------- progress meter (one skewed segment per quest) ---------- */
 .quest-progress { display: grid; gap: 8px; }
 .qp-head { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; }
@@ -599,6 +614,11 @@ dialog.win.is-closing .win-body { animation: sys-close 220ms var(--ease-in) forw
   transition: transform var(--dur-base) var(--ease-spring);
 }
 .segmented[data-value="once"] .seg-ink { transform: translateX(100%); }
+/* repeat-every picker */
+.gap-picks { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.gap-pick[aria-pressed="true"] { background: var(--blue); color: var(--on-accent); border-color: var(--blue); box-shadow: 0 0 12px rgba(76, 196, 255, .55); }
+.gap-custom { display: flex; align-items: center; gap: 10px; font-size: 17px; font-weight: 600; color: var(--text-2); }
+.gap-custom .input { width: 96px; text-align: center; font-variant-numeric: tabular-nums; }
 .collapse { display: grid; grid-template-rows: 1fr; transition: grid-template-rows var(--dur-base) var(--ease-out), opacity var(--dur-base); }
 .collapse > div { overflow: hidden; }
 .collapse.is-collapsed { grid-template-rows: 0fr; opacity: 0; }
@@ -826,6 +846,67 @@ dialog.win .daybox-head { padding-right: 40px; }
 
 
 /* ============================================================
+   Applications
+   ============================================================ */
+.apps { max-width: 820px; margin: 0 auto; }
+.apps-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.apps-filters { display: flex; flex-wrap: wrap; gap: 8px; }
+.apps-filter { gap: 8px; text-transform: none; letter-spacing: .04em; }
+.apps-count { min-width: 22px; padding: 0 6px; border: 1px solid var(--line-dim); font-size: 13px; font-variant-numeric: tabular-nums; }
+.apps-filter[aria-pressed="true"] { background: var(--blue); color: var(--on-accent); border-color: var(--blue); }
+.apps-filter[aria-pressed="true"] .apps-count { border-color: rgba(1, 4, 11, .4); }
+.apps-list { display: grid; }
+.app-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 14px;
+  padding: 12px 4px 12px 8px;
+  border-top: 1px solid var(--line-dim);
+  animation: rise var(--dur-slow) var(--ease-out) both;
+  animation-delay: calc(min(var(--i, 0), 10) * 50ms);
+}
+.app-row:last-child { border-bottom: 1px solid var(--line-dim); }
+.app-row.is-leaving { animation: leave var(--dur-base) var(--ease-in) forwards; }
+.app-main { display: grid; gap: 2px; min-width: 0; }
+.app-company { font-size: 20px; font-weight: 700; overflow-wrap: anywhere; }
+.app-role { font-size: 16px; color: var(--text); overflow-wrap: anywhere; }
+.app-meta { font-size: 14px; color: var(--text-2); overflow-wrap: anywhere; }
+.app-side { display: flex; align-items: center; gap: 4px; }
+
+/* status: colour plus the word itself (never colour alone) */
+.status-pick { --c: var(--blue); position: relative; display: inline-flex; align-items: center; }
+.status-pick select {
+  appearance: none;
+  -webkit-appearance: none;
+  min-height: 44px;
+  padding: 0 32px 0 12px;
+  border: 1px solid var(--c);
+  background: rgba(1, 4, 11, .6);
+  color: var(--c);
+  font: inherit;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+  cursor: pointer;
+  box-shadow: inset 0 0 12px color-mix(in srgb, var(--c) 25%, transparent);
+}
+.status-pick select option { color: var(--text); background: #06142c; text-transform: none; }
+.status-caret { position: absolute; right: 8px; width: 16px; height: 16px; color: var(--c); transform: rotate(90deg); pointer-events: none; }
+.status-pick.bump { animation: bump var(--dur-slow) var(--ease-spring); }
+.s-applied { --c: var(--blue); }
+.s-interviewing { --c: var(--streak); }
+.s-offer { --c: #5BE49B; }
+.s-rejected { --c: var(--danger); }
+.s-withdrawn { --c: var(--text-3); }
+@media (max-width: 480px) {
+  .app-row { grid-template-columns: minmax(0, 1fr); }
+  .app-side { justify-content: space-between; }
+  .apps-top .btn { width: 100%; }
+}
+
+/* ============================================================
    Small phones (checked at 280-430px wide and in landscape)
    ============================================================ */
 @media (max-width: 420px) {
@@ -834,6 +915,7 @@ dialog.win .daybox-head { padding-right: 40px; }
   .cal-head h2 { font-size: 19px; }
 }
 @media (max-width: 400px) {
+  .dock-item { width: 60px; } /* five items must fit a 360px phone */
   .sys-window { padding: 22px 14px 20px; }
   .win-body { padding: 22px 14px; }
   .win-head { gap: 6px; }
@@ -852,7 +934,8 @@ dialog.win .daybox-head { padding-right: 40px; }
   .win-head .box.icon-box, .segmented .icon { display: none; } /* decorative; titles need the room */
   .win-head .box { min-width: 0; white-space: normal; text-align: center; text-wrap: balance; }
   .dock { gap: 0; padding: 4px; }
-  .dock-item { width: 58px; }
+  .dock-item { width: 52px; }
+  .dock-label { font-size: 11px; letter-spacing: .04em; }
   .page { padding-left: 10px; padding-right: 10px; }
 }
 /* short screens (landscape phones): tighter vertical rhythm so windows need less scrolling */

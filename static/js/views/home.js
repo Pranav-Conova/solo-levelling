@@ -2,7 +2,7 @@ import { api, changed } from "../api.js";
 import { openAdd } from "../add.js";
 import { goalRowHTML, openQuest, paintGoalRow, paintProgress, progressHTML, toggleDone } from "../quest.js";
 import {
-  addDays, esc, fmt, heat, icon, makeWindow, openDialog, particles, playerPref, plural, reducedMotion, setPlayerPref, toast, todayISO, typewrite, userName, winHead, wireClose, withUndo,
+  addDays, esc, everyText, relativeDay, fmt, heat, icon, makeWindow, openDialog, particles, playerPref, plural, reducedMotion, setPlayerPref, toast, todayISO, typewrite, userName, winHead, wireClose, withUndo,
 } from "../util.js";
 
 export const title = "Quest Info";
@@ -32,6 +32,10 @@ export function mount(el) {
           <div data-personal hidden>
             <p class="sub-title" style="text-align:center;margin:6px 0 10px">Personal quests</p>
             <ul class="goal-list" data-once aria-label="Personal quests"></ul>
+          </div>
+          <div data-resting hidden>
+            <p class="sub-title" style="text-align:center;margin:6px 0 10px">Resting today</p>
+            <ul class="rest-list" data-rest aria-label="Quests not due today"></ul>
           </div>
           <p class="win-warn" data-warn></p>
           <p class="reset-timer">Time until reset: <b data-timer>--:--:--</b></p>
@@ -68,18 +72,33 @@ export function mount(el) {
     const once = tasks.filter((t) => !t.is_permanent);
     dailyEl.innerHTML = daily.length
       ? daily.map((t, i) => goalRowHTML(t, i, { info: habits.get(t.id) })).join("")
-      : `<li class="empty-line">${tasks.length ? "No daily quests yet." : "No quests have arrived yet."}</li>`;
+      : `<li class="empty-line">${tasks.length ? "No repeating quests due today." : habits.size ? "Nothing is due today." : "No quests have arrived yet."}</li>`;
     personalEl.hidden = !once.length;
     onceEl.innerHTML = once.map((t, i) => goalRowHTML(t, daily.length + i)).join("");
+    renderResting();
     if (quiet) el.querySelectorAll(".goal-row").forEach((r) => r.classList.add("static"));
     renderWarn();
+  }
+
+  // gap quests that aren't due today, so they don't seem to have vanished
+  function renderResting() {
+    const resting = [...habits.values()].filter((h) => !h.due_today);
+    el.querySelector("[data-resting]").hidden = !resting.length;
+    el.querySelector("[data-rest]").innerHTML = resting
+      .sort((a, b) => a.next_due.localeCompare(b.next_due))
+      .map((h) => {
+        const next = ["Today", "Tomorrow"].includes(relativeDay(h.next_due)) ? relativeDay(h.next_due).toLowerCase() : fmt(h.next_due, { weekday: "short", month: "short", day: "numeric" });
+        return `<li><span class="rest-name">${esc(h.title)}</span><span class="rest-next">${everyText(h.interval_days)} · next ${esc(next)}</span></li>`;
+      }).join("");
   }
 
   function renderWarn() {
     const tasks = visible();
     if (!tasks.length) {
       paintProgress(el, tasks);
-      warnEl.innerHTML = `Accept a quest to begin. <button class="btn btn-primary btn-block" type="button" data-first style="margin-top:12px">Create a quest</button>`;
+      warnEl.innerHTML = habits.size
+        ? `[No quests are due today. Rest and recover, ${esc(userName())}.]`
+        : `Accept a quest to begin. <button class="btn btn-primary btn-block" type="button" data-first style="margin-top:12px">Create a quest</button>`;
       return;
     }
     paintProgress(el, tasks);
@@ -234,7 +253,7 @@ export function mount(el) {
       renderGoals(!first);
       renderSide();
       if (first) {
-        typewrite(el.querySelector("[data-lead]"), d.tasks.length ? "[Daily Quest has arrived.]" : "[No Daily Quest has arrived yet.]");
+        typewrite(el.querySelector("[data-lead]"), d.tasks.length ? "[Daily Quest has arrived.]" : habits.size ? "[No quests are due today.]" : "[No Daily Quest has arrived yet.]");
         penaltyCheck();
       }
     } catch (err) {
